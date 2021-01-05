@@ -1,0 +1,73 @@
+{
+    "common": {
+        "name": "smart-connect-firestore-sync",
+        "version": "0.0.1",
+        "news": {
+            "0.0.1": {
+                "en": "initial release",
+                "de": "Erstveröffentlichung",
+                "ru": "Начальная версия",
+                "pt": "lançamento inicial",
+                "nl": "Eerste uitgave",
+                "fr": "Première version",
+                "it": "Versione iniziale",
+                "es": "Versión inicial",
+                "pl": "Pierwsze wydanie",
+                "zh-cn": "首次出版"
+            }
+        },
+        "title": "Smart Connect Firestore Sync",
+        "titleLang": {
+            "en": "Smart Connect Firestore Sync",
+            "de": "Smart Connect Firestore Sync",
+            "ru": "Smart Connect Firestore Sync",
+            "pt": "Smart Connect Firestore Sync",
+            "nl": "Smart Connect Firestore Sync",
+            "fr": "Synchronisation Firestore Smart Connect",
+            "it": "Smart Connect Firestore Sync",
+            "es": "Sincronización de Smart Connect Firestore",
+            "pl": "Smart Connect Firestore Sync",
+            "zh-cn": "Smart Connect Firestore同步"
+        },
+        "desc": {
+            "en": "Syncs states with firestore",
+            "de": "Synchronisiert Zustände mit Firestore",
+            "ru": "Синхронизирует состояния с хранилищем огня",
+            "pt": "Sincroniza estados com firestore",
+            "nl": "Synchroniseert staten met firestore",
+            "fr": "Synchronise les états avec Firestore",
+            "it": "Sincronizza gli stati con firestore",
+            "es": "Sincroniza estados con firestore",
+            "pl": "Synchronizuje stany z Firestore",
+            "zh-cn": "将状态与Firestore同步"
+        },
+        "authors": ["kosimst <kosimst@gmail.com>"],
+        "keywords": ["firestore", "firebase", "sync", "smart-connect"],
+        "license": "MIT",
+        "platform": "Javascript/Node.js",
+        "main": "build/main.js",
+        "icon": "smart-connect-firestore-sync.png",
+        "enabled": true,
+        "extIcon": "https://raw.githubusercontent.com/kosimst/ioBroker.smart-connect-firestore-sync/master/admin/smart-connect-firestore-sync.png",
+        "readme": "https://github.com/kosimst/ioBroker.smart-connect-firestore-sync/blob/master/README.md",
+        "loglevel": "info",
+        "mode": "daemon",
+        "type": "iot-systems",
+        "compact": true,
+        "connectionType": "cloud",
+        "dataSource": "push",
+        "materialize": true,
+        "supportCustoms": true,
+        "dependencies": [
+            {
+                "js-controller": ">=2.0.0"
+            }
+        ]
+    },
+    "native": {
+        "option1": true,
+        "option2": "42"
+    },
+    "objects": [],
+    "instanceObjects": []
+}
