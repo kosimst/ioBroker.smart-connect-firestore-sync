@@ -65,8 +65,24 @@
         ]
     },
     "native": {
-        "option1": true,
-        "option2": "42"
+        "serviceAccount": null,
+        "rooms": ["Sample Room"],
+        "devices": [
+            {
+                "name": "Sample switch",
+                "roomName": "Sample Room",
+                "sourceType": "branded-demo-switch"
+            }
+        ],
+        "sourceTypes": {
+            "branded-demo-switch": {
+                "targetType": "switch",
+                "values": []
+            }
+        },
+        "targetTypes": {
+            "switch": ["power"]
+        }
     },
     "objects": [],
     "instanceObjects": []
