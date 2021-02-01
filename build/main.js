@@ -84,7 +84,7 @@ class SmartConnectFirestoreSync extends utils.Adapter {
                 const valueBasePath = `${targetDeviceBasePath}.${targetValueName}`;
                 this.log.info(`Creating "${targetValueName}" value...`);
                 const sourceValue = (_b = sourceValues.find(({ targetValueName: target }) => targetValueName === target)) === null || _b === void 0 ? void 0 : _b.sourceValueName;
-                if (!sourceValue && !optional) {
+                if (!sourceValue && !optional && !virtual) {
                     this.log.error(`Could not find value mapping for ${deviceName} (${targetValueName}->${sourceValue})`);
                     throw new Error('Failed to create states');
                 }

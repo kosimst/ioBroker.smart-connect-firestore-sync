@@ -82,7 +82,7 @@ class SmartConnectFirestoreSync extends utils.Adapter {
 
                 const sourceValue = sourceValues.find(({ targetValueName: target }) => targetValueName === target)
                     ?.sourceValueName;
-                if (!sourceValue && !optional) {
+                if (!sourceValue && !optional && !virtual) {
                     this.log.error(
                         `Could not find value mapping for ${deviceName} (${targetValueName}->${sourceValue})`,
                     );
