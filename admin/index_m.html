@@ -391,7 +391,7 @@
                 });
 
                 const serviceAccountInput = document.getElementById('json-input');
-                serviceAccountInput.value = JSON.stringify(settingsProxy.serviceAccount);
+                serviceAccountInput.value = JSON.stringify(settingsProxy);
                 serviceAccountInput.onchange = ({ target: { value } }) => {
                     try {
                         window.settingsProxy = JSON.parse(value);

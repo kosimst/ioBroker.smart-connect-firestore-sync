@@ -5,12 +5,51 @@
 // The adapter-core module gives you access to the core ioBroker functions
 // you need to create an adapter
 import * as utils from '@iobroker/adapter-core';
+import firebase from 'firebase-admin';
 
 // Load your modules here, e.g.:
 // import * as fs from "fs";
 
+async function deleteCollection(db: firebase.firestore.Firestore, collectionPath: string, batchSize: number = 16) {
+    const collectionRef = db.collection(collectionPath);
+    const query = collectionRef.orderBy('__name__').limit(batchSize);
+
+    return new Promise((resolve, reject) => {
+        deleteQueryBatch(db, query, resolve).catch(reject);
+    });
+}
+
+async function deleteQueryBatch(
+    db: firebase.firestore.Firestore,
+    query: firebase.firestore.Query,
+    resolve: (...args: any[]) => any,
+): Promise<void> {
+    const snapshot = await query.get();
+
+    const batchSize = snapshot.size;
+    if (batchSize === 0) {
+        // When there are no documents left, we are done
+        resolve();
+        return;
+    }
+
+    // Delete documents in a batch
+    const batch = db.batch();
+    snapshot.docs.forEach((doc) => {
+        batch.delete(doc.ref);
+    });
+    await batch.commit();
+
+    // Recurse on the next process tick, to avoid
+    // exploding the stack.
+    process.nextTick(() => {
+        deleteQueryBatch(db, query, resolve);
+    });
+}
+
 class SmartConnectFirestoreSync extends utils.Adapter {
     #lastCurrentValues = new Map<string, any>();
+    #firestore: firebase.firestore.Firestore | null = null;
 
     public constructor(options: Partial<utils.AdapterOptions> = {}) {
         super({
@@ -28,7 +67,36 @@ class SmartConnectFirestoreSync extends utils.Adapter {
      * Is called when databases are connected and adapter received configuration.
      */
     private async onReady(): Promise<void> {
-        const { devices, sourceTypes } = this.config;
+        const { devices, sourceTypes, serviceAccount, rooms } = this.config;
+
+        let firebaseInit = false;
+        let firestore: firebase.firestore.Firestore | null = null;
+        try {
+            if (serviceAccount) {
+                const credentials = JSON.parse(serviceAccount);
+                if (credentials) {
+                    firebase.initializeApp(credentials);
+                    firebaseInit = true;
+                }
+            }
+        } catch (e) {
+            this.log.error(`Failed to initialize firebase: ${e}`);
+        }
+
+        if (firebaseInit) {
+            this.log.info('Firebase active');
+            firestore = firebase.firestore();
+            this.#firestore = firestore;
+            await deleteCollection(firestore, 'devices');
+            await deleteCollection(firestore, 'states');
+            await deleteCollection(firestore, 'rooms');
+
+            for (const room of rooms) {
+                await firestore.collection('rooms').add({ name: room });
+            }
+        } else {
+            this.log.warn('Firebase not active');
+        }
 
         this.log.info(`Adapter ${this.name} ready`);
 
@@ -61,8 +129,6 @@ class SmartConnectFirestoreSync extends utils.Adapter {
 
             const targeValues = Object.entries(this.config.targetTypes).find(([key]) => key === deviceTargetType)?.[1];
 
-            this.log.info(JSON.stringify(targeValues));
-
             if (!targeValues) {
                 this.log.warn(`Failed to set up device ${deviceName} as no target device values could be found`);
                 continue;
@@ -72,8 +138,13 @@ class SmartConnectFirestoreSync extends utils.Adapter {
 
             this.log.info(`Setting up "${deviceName}" in "${deviceRoomName}"...`);
 
+            if (firestore) {
+                await firestore
+                    .collection('devices')
+                    .add({ name: deviceName, roomName: deviceRoomName, type: deviceTargetType });
+            }
+
             for (const targetValueEntry of targeValues) {
-                this.log.info(JSON.stringify(targetValueEntry));
                 const { name: targetValueName, external = false, optional = false, virtual = false } = targetValueEntry;
                 // Create states in adapter
                 const valueBasePath = `${targetDeviceBasePath}.${targetValueName}`;
@@ -151,8 +222,28 @@ class SmartConnectFirestoreSync extends utils.Adapter {
                 await this.setStateAsync(`${valueBasePath}.value`, { val: actualValue, ack: true });
                 await this.setStateAsync(`${valueBasePath}.previous`, null);
                 await this.setStateAsync(`${valueBasePath}.timestamp`, { val: Date.now(), ack: true });
+
+                if (firestore) {
+                    await firestore.collection('states').add({
+                        deviceName,
+                        roomName: deviceRoomName,
+                        name: targetValueName,
+                        value: actualValue,
+                        timestamp: Date.now(),
+                        deviceType: deviceTargetType,
+                    });
+                }
             }
         }
+
+        firestore?.collection('states').onSnapshot((snap) => {
+            snap.docChanges().forEach((change) => {
+                const { deviceName, roomName, name, value, deviceType } = change.doc.data();
+                const statePath = `states.${roomName}.${deviceType}.${deviceName}.${name}`;
+
+                this.setStateAsync(statePath, { val: value, ack: false });
+            });
+        });
 
         await this.subscribeStatesAsync('states.*');
     }
@@ -231,6 +322,25 @@ class SmartConnectFirestoreSync extends utils.Adapter {
             await this.setStateAsync(`${targetPath}.value`, { val: state.val ?? null, ack: true });
             await this.setStateAsync(`${targetPath}.previous`, { val: previousValue ?? null, ack: true });
             await this.setStateAsync(`${targetPath}.timestamp`, { val: Date.now(), ack: true });
+
+            if (this.#firestore) {
+                const doc = await this.#firestore
+                    .collection('states')
+                    .where('deviceName', '==', device.name)
+                    .where('roomName', '==', device.roomName)
+                    .where('name', '==', targetValue)
+                    .where('deviceType', '==', sourceTypeDevice.targetType)
+                    .limit(1)
+                    .get();
+
+                if (doc.docs.length && doc.docs[0].exists) {
+                    doc.docs[0].ref.update({ value: state.val ?? null, timestamp: Date.now() });
+                } else {
+                    this.log.warn(
+                        `Could not find firestore value for ${device.name} in ${device.roomName} (${targetValue} of ${sourceTypeDevice.targetType})`,
+                    );
+                }
+            }
         } else {
             const [, , , roomName, targetDeviceType, deviceName, valueName, valueProperty] = id.split('.');
             const devicePath = `states.${roomName}.${targetDeviceType}.${deviceName}.${valueName}`;
