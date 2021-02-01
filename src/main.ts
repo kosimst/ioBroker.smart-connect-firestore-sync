@@ -69,8 +69,7 @@ class SmartConnectFirestoreSync extends utils.Adapter {
             this.log.info(`Setting up "${deviceName}" in "${deviceRoomName}"...`);
 
             for (const targetValueEntry of targeValues) {
-                const { name: targetValueName, external = false, optional = false, virtual = false } =
-                    typeof targetValueEntry === 'object' ? targetValueEntry : { name: targetValueEntry };
+                const { name: targetValueName, external = false, optional = false, virtual = false } = targetValueEntry;
                 // Create states in adapter
                 const valueBasePath = `${targetDeviceBasePath}.${targetValueName}`;
 

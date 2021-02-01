@@ -24,7 +24,7 @@ declare global {
                 };
             };
             targetTypes: {
-                [key: string]: (string | { name: string; optional?: boolean; external?: boolean; virtual?: boolean })[];
+                [key: string]: { name: string; optional?: boolean; external?: boolean; virtual?: boolean }[];
             };
             scenes: {
                 name: string;
