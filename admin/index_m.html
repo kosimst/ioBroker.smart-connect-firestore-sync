@@ -380,27 +380,30 @@
                         console.log(target);
                         onChange();
 
-                        devicesRenderer(settingsProxy);
-                        roomsRenderer(settingsProxy);
-                        deviceTypesRenderer(settingsProxy);
-                        targetDevicesRender(settingsProxy);
-                        scenesRenderer(settingsProxy);
+                        //devicesRenderer(settingsProxy);
+                        //roomsRenderer(settingsProxy);
+                        //deviceTypesRenderer(settingsProxy);
+                        //targetDevicesRender(settingsProxy);
+                        //scenesRenderer(settingsProxy);
 
                         return true;
                     },
                 });
 
-                const serviceAccountInput = document.getElementById('service-account');
+                const serviceAccountInput = document.getElementById('json-input');
                 serviceAccountInput.value = JSON.stringify(settingsProxy.serviceAccount);
                 serviceAccountInput.onchange = ({ target: { value } }) => {
-                    settingsProxy.serviceAccount = value;
+                    try {
+                        window.settingsProxy = JSON.parse(value);
+                        onChange();
+                    } catch {}
                 };
 
-                devicesRenderer(settingsProxy);
-                roomsRenderer(settingsProxy);
-                deviceTypesRenderer(settingsProxy);
-                targetDevicesRender(settingsProxy);
-                scenesRenderer(settingsProxy);
+                //devicesRenderer(settingsProxy);
+                //roomsRenderer(settingsProxy);
+                //deviceTypesRenderer(settingsProxy);
+                //targetDevicesRender(settingsProxy);
+                //scenesRenderer(settingsProxy);
             };
 
             window.save = function save(callback) {
@@ -415,13 +418,8 @@
             <br />
             <div class="row">
                 <div class="col s6 input-field">
-                    <input
-                        type="text"
-                        class="value"
-                        id="service-account"
-                        placeholder="Paste your firebase service account here..."
-                    />
-                    <label for="service-account" class="translate">Service Account</label>
+                    <input type="text" class="value" id="json-input" placeholder="Paste your raw JSON config here..." />
+                    <label for="json-input" class="translate">JSON Input</label>
                 </div>
             </div>
 
