@@ -57,7 +57,11 @@ class SmartConnectFirestoreSync extends utils.Adapter {
 
             const { targetType: deviceTargetType, values: sourceValues } = deviceSourceObject;
 
+            this.log.info(`Device is typeof "${deviceTargetType}" (${deviceSourceType})`);
+
             const targeValues = Object.entries(this.config.targetTypes).find(([key]) => key === deviceTargetType)?.[1];
+
+            this.log.info(JSON.stringify(targeValues));
 
             if (!targeValues) {
                 this.log.warn(`Failed to set up device ${deviceName} as no target device values could be found`);
@@ -69,6 +73,7 @@ class SmartConnectFirestoreSync extends utils.Adapter {
             this.log.info(`Setting up "${deviceName}" in "${deviceRoomName}"...`);
 
             for (const targetValueEntry of targeValues) {
+                this.log.info(JSON.stringify(targetValueEntry));
                 const { name: targetValueName, external = false, optional = false, virtual = false } = targetValueEntry;
                 // Create states in adapter
                 const valueBasePath = `${targetDeviceBasePath}.${targetValueName}`;
