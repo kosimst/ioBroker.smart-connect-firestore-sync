@@ -213,7 +213,7 @@ class SmartConnectFirestoreSync extends utils.Adapter {
                 this.log.info(`Created "${targetValueName}" with value ${actualValue}`);
                 await this.setStateAsync(`${valueBasePath}.value`, { val: actualValue, ack: true });
                 await this.setStateAsync(`${valueBasePath}.previous`, null);
-                await this.setStateAsync(`${valueBasePath}.timestamp`, { val: Date.now(), ack: true });
+                await this.setStateAsync(`${valueBasePath}.timestamp`, { val: new Date().toUTCString(), ack: true });
                 if (firestore) {
                     await firestore.collection('states').add({
                         deviceName,
@@ -302,7 +302,7 @@ class SmartConnectFirestoreSync extends utils.Adapter {
             const previousValue = (_c = (await this.getStateAsync(`${targetPath}.value`))) === null || _c === void 0 ? void 0 : _c.val;
             await this.setStateAsync(`${targetPath}.value`, { val: (_d = state.val) !== null && _d !== void 0 ? _d : null, ack: true });
             await this.setStateAsync(`${targetPath}.previous`, { val: previousValue !== null && previousValue !== void 0 ? previousValue : null, ack: true });
-            await this.setStateAsync(`${targetPath}.timestamp`, { val: Date.now(), ack: true });
+            await this.setStateAsync(`${targetPath}.timestamp`, { val: new Date().toUTCString(), ack: true });
             if (__classPrivateFieldGet(this, _firestore)) {
                 const doc = await __classPrivateFieldGet(this, _firestore).collection('states')
                     .where('deviceName', '==', device.name)
@@ -312,7 +312,7 @@ class SmartConnectFirestoreSync extends utils.Adapter {
                     .limit(1)
                     .get();
                 if (doc.docs.length && doc.docs[0].exists) {
-                    doc.docs[0].ref.update({ value: (_e = state.val) !== null && _e !== void 0 ? _e : null, timestamp: Date.now() });
+                    doc.docs[0].ref.update({ value: (_e = state.val) !== null && _e !== void 0 ? _e : null, timestamp: new Date().toUTCString() });
                 }
                 else {
                     this.log.warn(`Could not find firestore value for ${device.name} in ${device.roomName} (${targetValue} of ${sourceTypeDevice.targetType})`);
@@ -339,7 +339,7 @@ class SmartConnectFirestoreSync extends utils.Adapter {
                     throw new Error('No value mapping found for state change');
                 const sourceDevicePath = `${sourceDeviceBasePath}.${sourceDeviceValue}`;
                 await this.setForeignStateAsync(sourceDevicePath, { val: (_g = state.val) !== null && _g !== void 0 ? _g : null });
-                await this.setStateAsync(`${devicePath}.timestamp`, { ack: true, val: Date.now() });
+                await this.setStateAsync(`${devicePath}.timestamp`, { ack: true, val: new Date().toUTCString() });
                 await this.setStateAsync(`${devicePath}.previous`, {
                     val: (_h = __classPrivateFieldGet(this, _lastCurrentValues).get(sourceDevicePath)) !== null && _h !== void 0 ? _h : null,
                     ack: true,

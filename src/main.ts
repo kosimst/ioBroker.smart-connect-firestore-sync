@@ -221,7 +221,7 @@ class SmartConnectFirestoreSync extends utils.Adapter {
 
                 await this.setStateAsync(`${valueBasePath}.value`, { val: actualValue, ack: true });
                 await this.setStateAsync(`${valueBasePath}.previous`, null);
-                await this.setStateAsync(`${valueBasePath}.timestamp`, { val: Date.now(), ack: true });
+                await this.setStateAsync(`${valueBasePath}.timestamp`, { val: new Date().toUTCString(), ack: true });
 
                 if (firestore) {
                     await firestore.collection('states').add({
@@ -321,7 +321,7 @@ class SmartConnectFirestoreSync extends utils.Adapter {
 
             await this.setStateAsync(`${targetPath}.value`, { val: state.val ?? null, ack: true });
             await this.setStateAsync(`${targetPath}.previous`, { val: previousValue ?? null, ack: true });
-            await this.setStateAsync(`${targetPath}.timestamp`, { val: Date.now(), ack: true });
+            await this.setStateAsync(`${targetPath}.timestamp`, { val: new Date().toUTCString(), ack: true });
 
             if (this.#firestore) {
                 const doc = await this.#firestore
@@ -334,7 +334,7 @@ class SmartConnectFirestoreSync extends utils.Adapter {
                     .get();
 
                 if (doc.docs.length && doc.docs[0].exists) {
-                    doc.docs[0].ref.update({ value: state.val ?? null, timestamp: Date.now() });
+                    doc.docs[0].ref.update({ value: state.val ?? null, timestamp: new Date().toUTCString() });
                 } else {
                     this.log.warn(
                         `Could not find firestore value for ${device.name} in ${device.roomName} (${targetValue} of ${sourceTypeDevice.targetType})`,
@@ -369,7 +369,7 @@ class SmartConnectFirestoreSync extends utils.Adapter {
                 const sourceDevicePath = `${sourceDeviceBasePath}.${sourceDeviceValue}`;
 
                 await this.setForeignStateAsync(sourceDevicePath, { val: state.val ?? null });
-                await this.setStateAsync(`${devicePath}.timestamp`, { ack: true, val: Date.now() });
+                await this.setStateAsync(`${devicePath}.timestamp`, { ack: true, val: new Date().toUTCString() });
                 await this.setStateAsync(`${devicePath}.previous`, {
                     val: this.#lastCurrentValues.get(sourceDevicePath) ?? null,
                     ack: true,
