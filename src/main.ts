@@ -10,7 +10,11 @@ import firebase from 'firebase-admin';
 // Load your modules here, e.g.:
 // import * as fs from "fs";
 
-async function deleteCollection(db: firebase.firestore.Firestore, collectionPath: string, batchSize: number = 16) {
+async function deleteCollection(
+    db: firebase.firestore.Firestore,
+    collectionPath: string,
+    batchSize = 16,
+): Promise<void> {
     const collectionRef = db.collection(collectionPath);
     const query = collectionRef.orderBy('__name__').limit(batchSize);
 
