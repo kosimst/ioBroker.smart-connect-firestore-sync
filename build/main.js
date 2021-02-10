@@ -96,11 +96,11 @@ class SmartConnectFirestoreSync extends utils.Adapter {
         let firestore = null;
         try {
             if (serviceAccount) {
-                const credentials = JSON.parse(serviceAccount);
-                if (credentials) {
-                    firebase_admin_1.default.initializeApp(credentials);
-                    firebaseInit = true;
-                }
+                firebase_admin_1.default.initializeApp({
+                    credential: firebase_admin_1.default.credential.cert(serviceAccount),
+                    databaseURL: 'https://kosimst-smart-home.firebaseio.com',
+                });
+                firebaseInit = true;
             }
         }
         catch (e) {
