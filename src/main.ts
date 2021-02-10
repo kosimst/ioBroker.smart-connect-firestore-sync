@@ -247,7 +247,7 @@ class SmartConnectFirestoreSync extends utils.Adapter {
 
                 this.log.info(`Firestore value "${name}" from ${deviceName} changed to ${value}`);
 
-                this.setStateAsync(statePath, { val: value, ack: false });
+                this.setStateAsync(statePath, { val: value, ack: false, c: 'firestore-update' });
             });
         });
 
@@ -289,8 +289,14 @@ class SmartConnectFirestoreSync extends utils.Adapter {
         this.log.info(`State "${id}" changed by ${state.from}`);
         this.log.info(`New value: "${state.val}"`);
 
+        const isFirestoreUpdate = state.c === 'firestore-update';
+
+        if (isFirestoreUpdate) {
+            this.log.info('State changed due to firestore update');
+        }
+
         const isSelfModified = state.from.includes('smart-connect-firestore-sync');
-        if (isSelfModified) {
+        if (isSelfModified && !isFirestoreUpdate) {
             this.log.info('State change was self-modified, ignoring...');
             return;
         }
