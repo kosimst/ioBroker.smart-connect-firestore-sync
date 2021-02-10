@@ -230,6 +230,7 @@ class SmartConnectFirestoreSync extends utils.Adapter {
             snap.docChanges().forEach((change) => {
                 const { deviceName, roomName, name, value, deviceType } = change.doc.data();
                 const statePath = `states.${roomName}.${deviceType}.${deviceName}.${name}`;
+                this.log.info(`Firestore value "${name}" from ${deviceName} changed to ${value}`);
                 this.setStateAsync(statePath, { val: value, ack: false });
             });
         });
@@ -269,6 +270,7 @@ class SmartConnectFirestoreSync extends utils.Adapter {
         if (!state)
             return;
         this.log.info(`State "${id}" changed by ${state.from}`);
+        this.log.info(`New value: "${state.val}"`);
         const isSelfModified = state.from.includes('smart-connect-firestore-sync');
         if (isSelfModified) {
             this.log.info('State change was self-modified, ignoring...');
