@@ -241,13 +241,17 @@ class SmartConnectFirestoreSync extends utils.Adapter {
         }
 
         firestore?.collection('states').onSnapshot((snap) => {
-            snap.docChanges().forEach((change) => {
+            snap.docChanges().forEach(async (change) => {
                 const { deviceName, roomName, name, value, deviceType } = change.doc.data();
                 const statePath = `states.${roomName}.${deviceType}.${deviceName}.${name}.value`;
 
                 this.log.info(`Firestore value "${name}" from ${deviceName} changed to ${value}`);
 
-                this.setStateAsync(statePath, { val: value, ack: false, c: 'firestore-update' });
+                const oldState = (await this.getStateAsync(statePath))?.val;
+
+                if (oldState == value) return;
+
+                await this.setStateAsync(statePath, { val: value, ack: false, c: 'firestore-update' });
             });
         });
 
@@ -287,6 +291,7 @@ class SmartConnectFirestoreSync extends utils.Adapter {
         if (!state) return;
 
         this.log.info(`State "${id}" changed by ${state.from}`);
+        this.log.info(`Full state: ${JSON.stringify(state)}`);
 
         const isSelfModified = state.from.includes('smart-connect-firestore-sync');
         if (isSelfModified && state.ack) {
@@ -339,7 +344,12 @@ class SmartConnectFirestoreSync extends utils.Adapter {
                     .get();
 
                 if (doc.docs.length && doc.docs[0].exists) {
-                    doc.docs[0].ref.update({ value: state.val ?? null, timestamp: new Date().toUTCString() });
+                    const docRef = doc.docs[0].ref;
+                    const oldValue = (await docRef.get()).data()?.value;
+
+                    if (oldValue != state.val ?? null) {
+                        docRef.update({ value: state.val ?? null, timestamp: new Date().toUTCString() });
+                    }
                 } else {
                     this.log.warn(
                         `Could not find firestore value for ${device.name} in ${device.roomName} (${targetValue} of ${sourceTypeDevice.targetType})`,
