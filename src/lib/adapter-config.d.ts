@@ -4,7 +4,7 @@
 declare global {
     namespace ioBroker {
         interface AdapterConfig {
-            serviceAccount: string | null;
+            serviceAccount: string | firebase.ServiceAccount | null;
             rooms: string[];
             devices: {
                 name: string;

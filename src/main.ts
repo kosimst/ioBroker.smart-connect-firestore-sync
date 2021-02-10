@@ -77,11 +77,11 @@ class SmartConnectFirestoreSync extends utils.Adapter {
         let firestore: firebase.firestore.Firestore | null = null;
         try {
             if (serviceAccount) {
-                const credentials = JSON.parse(serviceAccount);
-                if (credentials) {
-                    firebase.initializeApp(credentials);
-                    firebaseInit = true;
-                }
+                firebase.initializeApp({
+                    credential: firebase.credential.cert(serviceAccount),
+                    databaseURL: 'https://kosimst-smart-home.firebaseio.com',
+                });
+                firebaseInit = true;
             }
         } catch (e) {
             this.log.error(`Failed to initialize firebase: ${e}`);
