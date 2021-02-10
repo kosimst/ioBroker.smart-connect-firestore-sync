@@ -271,13 +271,8 @@ class SmartConnectFirestoreSync extends utils.Adapter {
             return;
         this.log.info(`State "${id}" changed by ${state.from}`);
         this.log.info(`New value: "${state.val}"`);
-        this.log.info(`State Object: ${JSON.stringify(state)}`);
-        const isFirestoreUpdate = state.c === 'firestore-update';
-        if (isFirestoreUpdate) {
-            this.log.info('State changed due to firestore update');
-        }
         const isSelfModified = state.from.includes('smart-connect-firestore-sync');
-        if (isSelfModified && !isFirestoreUpdate) {
+        if (isSelfModified && state.ack) {
             this.log.info('State change was self-modified, ignoring...');
             return;
         }
