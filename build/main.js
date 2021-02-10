@@ -270,10 +270,8 @@ class SmartConnectFirestoreSync extends utils.Adapter {
         if (!state)
             return;
         this.log.info(`State "${id}" changed by ${state.from}`);
-        this.log.info(`New value: "${state.val}"`);
         const isSelfModified = state.from.includes('smart-connect-firestore-sync');
         if (isSelfModified && state.ack) {
-            this.log.info('State change was self-modified, ignoring...');
             return;
         }
         const isForeign = !id.includes('smart-connect-firestore-sync');
@@ -328,17 +326,25 @@ class SmartConnectFirestoreSync extends utils.Adapter {
                 return;
             try {
                 const device = this.config.devices.find(({ roomName: deviceRoomName, name }) => deviceRoomName === roomName && name === deviceName);
-                if (!device)
-                    throw new Error('No device found to changed state');
-                if (!device.path)
+                if (!device) {
+                    this.log.error('No device found to changed state');
                     return;
+                }
+                if (!device.path) {
+                    this.log.warn('No device path found to changed state');
+                    return;
+                }
                 const { sourceType, path: sourceDeviceBasePath } = device;
                 const sourceDeviceType = this.config.sourceTypes[sourceType];
-                if (!sourceDeviceType)
-                    throw new Error('No source device type found for state change');
+                if (!sourceDeviceType) {
+                    this.log.error('No source device type found for state change');
+                    return;
+                }
                 const sourceDeviceValue = ((_f = sourceDeviceType.values.find(({ targetValueName }) => targetValueName === valueName)) === null || _f === void 0 ? void 0 : _f.sourceValueName) || valueName;
-                if (!sourceDeviceValue)
-                    throw new Error('No value mapping found for state change');
+                if (!sourceDeviceValue) {
+                    this.log.error('No value mapping found for state change');
+                    return;
+                }
                 const sourceDevicePath = `${sourceDeviceBasePath}.${sourceDeviceValue}`;
                 await this.setForeignStateAsync(sourceDevicePath, { val: (_g = state.val) !== null && _g !== void 0 ? _g : null });
                 await this.setStateAsync(`${devicePath}.timestamp`, { ack: true, val: new Date().toUTCString() });
