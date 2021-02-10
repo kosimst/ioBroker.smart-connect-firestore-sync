@@ -229,7 +229,7 @@ class SmartConnectFirestoreSync extends utils.Adapter {
         firestore === null || firestore === void 0 ? void 0 : firestore.collection('states').onSnapshot((snap) => {
             snap.docChanges().forEach((change) => {
                 const { deviceName, roomName, name, value, deviceType } = change.doc.data();
-                const statePath = `states.${roomName}.${deviceType}.${deviceName}.${name}`;
+                const statePath = `states.${roomName}.${deviceType}.${deviceName}.${name}.value`;
                 this.log.info(`Firestore value "${name}" from ${deviceName} changed to ${value}`);
                 this.setStateAsync(statePath, { val: value, ack: false, c: 'firestore-update' });
             });
@@ -270,7 +270,6 @@ class SmartConnectFirestoreSync extends utils.Adapter {
         if (!state)
             return;
         this.log.info(`State "${id}" changed by ${state.from}`);
-        this.log.info(`Full state: ${JSON.stringify(state)}`);
         const isSelfModified = state.from.includes('smart-connect-firestore-sync');
         if (isSelfModified && state.ack) {
             return;
