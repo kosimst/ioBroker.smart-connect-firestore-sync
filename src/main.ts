@@ -305,31 +305,52 @@ class SmartConnectFirestoreSync extends utils.Adapter {
         const isForeign = !id.includes('smart-connect-firestore-sync');
 
         if (isForeign) {
-            const devicePath = this.config.devices.find(({ path }) => path && id.includes(path))?.path;
-            if (!devicePath) {
-                this.log.warn('No device matches the changed path');
-                return;
-            }
-            this.log.info(`Device path: ${devicePath}`);
-            const device = this.config.devices.find(({ path }) => path === devicePath);
+            const defaultDevice = this.config.devices.find(
+                ({ externalStates }) =>
+                    externalStates && Object.values(externalStates).find((externalPath) => id.includes(externalPath)),
+            );
+            const externalDevice = this.config.devices.find(({ path }) => path && id.includes(path));
+
+            const device = defaultDevice || externalDevice;
+
             if (!device) {
                 this.log.warn(`No device found for state change`);
                 return;
             }
-            const sourceValue = id.replace(devicePath, '').replace(/^\./, '');
+
+            let targetPath: string | undefined = undefined;
+            let targetValue: string | undefined = undefined;
+
             const sourceTypeDevice = this.config.sourceTypes[device.sourceType];
-            if (!sourceTypeDevice) {
-                this.log.warn(`No source device declaration found for state change`);
-                return;
+
+            if (defaultDevice) {
+                if (!device.path) {
+                    this.log.error('No path found for changed device');
+                    return;
+                }
+                const sourceValue = id.replace(device.path, '').replace(/^\./, '');
+                if (!sourceTypeDevice) {
+                    this.log.warn(`No source device declaration found for state change`);
+                    return;
+                }
+                targetValue =
+                    sourceTypeDevice.values.find(({ sourceValueName }) => sourceValueName === sourceValue)
+                        ?.targetValueName || sourceValue;
+                if (!targetValue) {
+                    this.log.warn(`No target value mapping found for state change`);
+                    return;
+                }
+                targetPath = `states.${device.roomName}.${sourceTypeDevice.targetType}.${device.name}.${targetValue}`;
+            } else {
+                targetValue = Object.entries(device.externalStates!).find(([name, externalPath]) =>
+                    id.includes(externalPath),
+                )?.[0];
+                if (!targetValue) {
+                    this.log.error(`Could not find target value name of changed external state`);
+                    return;
+                }
+                targetPath = `states.${device.roomName}.${sourceTypeDevice.targetType}.${device.name}.${targetValue}`;
             }
-            const targetValue =
-                sourceTypeDevice.values.find(({ sourceValueName }) => sourceValueName === sourceValue)
-                    ?.targetValueName || sourceValue;
-            if (!targetValue) {
-                this.log.warn(`No target value mapping found for state change`);
-                return;
-            }
-            const targetPath = `states.${device.roomName}.${sourceTypeDevice.targetType}.${device.name}.${targetValue}`;
 
             const previousValue = (await this.getStateAsync(`${targetPath}.value`))?.val;
 
@@ -381,6 +402,17 @@ class SmartConnectFirestoreSync extends utils.Adapter {
 
                 const { sourceType, path: sourceDeviceBasePath } = device;
 
+                const targetValueDefinition = this.config.targetTypes[targetDeviceType].find(
+                    ({ name }) => valueName === name,
+                );
+
+                if (!targetValueDefinition) {
+                    this.log.error(`Could not find target value definition`);
+                    return;
+                }
+
+                const isExternal = !!targetValueDefinition.external;
+
                 const sourceDeviceType = this.config.sourceTypes[sourceType];
 
                 if (!sourceDeviceType) {
@@ -397,7 +429,9 @@ class SmartConnectFirestoreSync extends utils.Adapter {
                     return;
                 }
 
-                const sourceDevicePath = `${sourceDeviceBasePath}.${sourceDeviceValue}`;
+                const sourceDevicePath = isExternal
+                    ? Object.entries(device.externalStates!).find(([key]) => key === valueName)?.[1] || ''
+                    : `${sourceDeviceBasePath}.${sourceDeviceValue}`;
 
                 await this.setForeignStateAsync(sourceDevicePath, { val: state.val ?? null });
                 await this.setStateAsync(`${devicePath}.timestamp`, { ack: true, val: new Date().toUTCString() });

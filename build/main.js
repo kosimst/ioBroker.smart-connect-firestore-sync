@@ -272,7 +272,7 @@ class SmartConnectFirestoreSync extends utils.Adapter {
      * Is called if a subscribed state changes
      */
     async onStateChange(id, state) {
-        var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k, _l, _m, _o;
+        var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k, _l, _m, _o, _p;
         if (!state)
             return;
         this.log.info(`State "${id}" changed by ${state.from}`);
@@ -283,29 +283,42 @@ class SmartConnectFirestoreSync extends utils.Adapter {
         }
         const isForeign = !id.includes('smart-connect-firestore-sync');
         if (isForeign) {
-            const devicePath = (_a = this.config.devices.find(({ path }) => path && id.includes(path))) === null || _a === void 0 ? void 0 : _a.path;
-            if (!devicePath) {
-                this.log.warn('No device matches the changed path');
-                return;
-            }
-            this.log.info(`Device path: ${devicePath}`);
-            const device = this.config.devices.find(({ path }) => path === devicePath);
+            const defaultDevice = this.config.devices.find(({ externalStates }) => externalStates && Object.values(externalStates).find((externalPath) => id.includes(externalPath)));
+            const externalDevice = this.config.devices.find(({ path }) => path && id.includes(path));
+            const device = defaultDevice || externalDevice;
             if (!device) {
                 this.log.warn(`No device found for state change`);
                 return;
             }
-            const sourceValue = id.replace(devicePath, '').replace(/^\./, '');
+            let targetPath = undefined;
+            let targetValue = undefined;
             const sourceTypeDevice = this.config.sourceTypes[device.sourceType];
-            if (!sourceTypeDevice) {
-                this.log.warn(`No source device declaration found for state change`);
-                return;
+            if (defaultDevice) {
+                if (!device.path) {
+                    this.log.error('No path found for changed device');
+                    return;
+                }
+                const sourceValue = id.replace(device.path, '').replace(/^\./, '');
+                if (!sourceTypeDevice) {
+                    this.log.warn(`No source device declaration found for state change`);
+                    return;
+                }
+                targetValue =
+                    ((_a = sourceTypeDevice.values.find(({ sourceValueName }) => sourceValueName === sourceValue)) === null || _a === void 0 ? void 0 : _a.targetValueName) || sourceValue;
+                if (!targetValue) {
+                    this.log.warn(`No target value mapping found for state change`);
+                    return;
+                }
+                targetPath = `states.${device.roomName}.${sourceTypeDevice.targetType}.${device.name}.${targetValue}`;
             }
-            const targetValue = ((_b = sourceTypeDevice.values.find(({ sourceValueName }) => sourceValueName === sourceValue)) === null || _b === void 0 ? void 0 : _b.targetValueName) || sourceValue;
-            if (!targetValue) {
-                this.log.warn(`No target value mapping found for state change`);
-                return;
+            else {
+                targetValue = (_b = Object.entries(device.externalStates).find(([name, externalPath]) => id.includes(externalPath))) === null || _b === void 0 ? void 0 : _b[0];
+                if (!targetValue) {
+                    this.log.error(`Could not find target value name of changed external state`);
+                    return;
+                }
+                targetPath = `states.${device.roomName}.${sourceTypeDevice.targetType}.${device.name}.${targetValue}`;
             }
-            const targetPath = `states.${device.roomName}.${sourceTypeDevice.targetType}.${device.name}.${targetValue}`;
             const previousValue = (_c = (await this.getStateAsync(`${targetPath}.value`))) === null || _c === void 0 ? void 0 : _c.val;
             await this.setStateAsync(`${targetPath}.value`, { val: (_d = state.val) !== null && _d !== void 0 ? _d : null, ack: true });
             await this.setStateAsync(`${targetPath}.previous`, { val: previousValue !== null && previousValue !== void 0 ? previousValue : null, ack: true });
@@ -346,6 +359,12 @@ class SmartConnectFirestoreSync extends utils.Adapter {
                     return;
                 }
                 const { sourceType, path: sourceDeviceBasePath } = device;
+                const targetValueDefinition = this.config.targetTypes[targetDeviceType].find(({ name }) => valueName === name);
+                if (!targetValueDefinition) {
+                    this.log.error(`Could not find target value definition`);
+                    return;
+                }
+                const isExternal = !!targetValueDefinition.external;
                 const sourceDeviceType = this.config.sourceTypes[sourceType];
                 if (!sourceDeviceType) {
                     this.log.error('No source device type found for state change');
@@ -356,19 +375,21 @@ class SmartConnectFirestoreSync extends utils.Adapter {
                     this.log.error('No value mapping found for state change');
                     return;
                 }
-                const sourceDevicePath = `${sourceDeviceBasePath}.${sourceDeviceValue}`;
-                await this.setForeignStateAsync(sourceDevicePath, { val: (_j = state.val) !== null && _j !== void 0 ? _j : null });
+                const sourceDevicePath = isExternal
+                    ? ((_j = Object.entries(device.externalStates).find(([key]) => key === valueName)) === null || _j === void 0 ? void 0 : _j[1]) || ''
+                    : `${sourceDeviceBasePath}.${sourceDeviceValue}`;
+                await this.setForeignStateAsync(sourceDevicePath, { val: (_k = state.val) !== null && _k !== void 0 ? _k : null });
                 await this.setStateAsync(`${devicePath}.timestamp`, { ack: true, val: new Date().toUTCString() });
                 await this.setStateAsync(`${devicePath}.previous`, {
-                    val: (_k = __classPrivateFieldGet(this, _lastCurrentValues).get(sourceDevicePath)) !== null && _k !== void 0 ? _k : null,
+                    val: (_l = __classPrivateFieldGet(this, _lastCurrentValues).get(sourceDevicePath)) !== null && _l !== void 0 ? _l : null,
                     ack: true,
                 });
-                __classPrivateFieldGet(this, _lastCurrentValues).set(sourceDevicePath, (_l = state.val) !== null && _l !== void 0 ? _l : null);
-                await this.setStateAsync(`${devicePath}.value`, { val: (_m = state.val) !== null && _m !== void 0 ? _m : null, ack: true });
+                __classPrivateFieldGet(this, _lastCurrentValues).set(sourceDevicePath, (_m = state.val) !== null && _m !== void 0 ? _m : null);
+                await this.setStateAsync(`${devicePath}.value`, { val: (_o = state.val) !== null && _o !== void 0 ? _o : null, ack: true });
             }
             catch (e) {
                 this.log.warn(e.message);
-                const prevValue = (_o = (await this.getStateAsync(`${devicePath}.previous`))) === null || _o === void 0 ? void 0 : _o.val;
+                const prevValue = (_p = (await this.getStateAsync(`${devicePath}.previous`))) === null || _p === void 0 ? void 0 : _p.val;
                 await this.setStateAsync(`${devicePath}.value`, { ack: true, val: prevValue !== null && prevValue !== void 0 ? prevValue : null });
             }
         }
