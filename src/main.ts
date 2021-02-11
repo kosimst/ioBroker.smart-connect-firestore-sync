@@ -305,11 +305,11 @@ class SmartConnectFirestoreSync extends utils.Adapter {
         const isForeign = !id.includes('smart-connect-firestore-sync');
 
         if (isForeign) {
-            const defaultDevice = this.config.devices.find(
+            const externalDevice = this.config.devices.find(
                 ({ externalStates }) =>
                     externalStates && Object.values(externalStates).find((externalPath) => id.includes(externalPath)),
             );
-            const externalDevice = this.config.devices.find(({ path }) => path && id.includes(path));
+            const defaultDevice = this.config.devices.find(({ path }) => path && id.includes(path));
 
             const device = defaultDevice || externalDevice;
 
@@ -342,7 +342,7 @@ class SmartConnectFirestoreSync extends utils.Adapter {
                 }
                 targetPath = `states.${device.roomName}.${sourceTypeDevice.targetType}.${device.name}.${targetValue}`;
             } else {
-                targetValue = Object.entries(device.externalStates!).find(([name, externalPath]) =>
+                targetValue = Object.entries(device.externalStates!).find(([, externalPath]) =>
                     id.includes(externalPath),
                 )?.[0];
                 if (!targetValue) {

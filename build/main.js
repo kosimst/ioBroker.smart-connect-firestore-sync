@@ -283,8 +283,8 @@ class SmartConnectFirestoreSync extends utils.Adapter {
         }
         const isForeign = !id.includes('smart-connect-firestore-sync');
         if (isForeign) {
-            const defaultDevice = this.config.devices.find(({ externalStates }) => externalStates && Object.values(externalStates).find((externalPath) => id.includes(externalPath)));
-            const externalDevice = this.config.devices.find(({ path }) => path && id.includes(path));
+            const externalDevice = this.config.devices.find(({ externalStates }) => externalStates && Object.values(externalStates).find((externalPath) => id.includes(externalPath)));
+            const defaultDevice = this.config.devices.find(({ path }) => path && id.includes(path));
             const device = defaultDevice || externalDevice;
             if (!device) {
                 this.log.warn(`No device found for state change`);
@@ -312,7 +312,7 @@ class SmartConnectFirestoreSync extends utils.Adapter {
                 targetPath = `states.${device.roomName}.${sourceTypeDevice.targetType}.${device.name}.${targetValue}`;
             }
             else {
-                targetValue = (_b = Object.entries(device.externalStates).find(([name, externalPath]) => id.includes(externalPath))) === null || _b === void 0 ? void 0 : _b[0];
+                targetValue = (_b = Object.entries(device.externalStates).find(([, externalPath]) => id.includes(externalPath))) === null || _b === void 0 ? void 0 : _b[0];
                 if (!targetValue) {
                     this.log.error(`Could not find target value name of changed external state`);
                     return;
