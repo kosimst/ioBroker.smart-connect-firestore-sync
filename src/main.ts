@@ -164,6 +164,20 @@ class SmartConnectFirestoreSync extends utils.Adapter {
                     throw new Error('Failed to create states');
                 }
 
+                if (
+                    !virtual &&
+                    ((!sourceValue && !external) || (external && (!externalStates || !externalStates[targetValueName])))
+                ) {
+                    if (optional) {
+                        this.log.info(`Skipping non-present optional state "${targetValueName}" (${deviceName})`);
+                    } else {
+                        this.log.error(
+                            `Could not find matching source device value for "${targetValueName}" (${deviceName})`,
+                        );
+                    }
+                    continue;
+                }
+
                 await this.setObjectNotExistsAsync(`${valueBasePath}.value`, {
                     type: 'state',
                     common: {
@@ -205,16 +219,6 @@ class SmartConnectFirestoreSync extends utils.Adapter {
                 let sourceValuePath = '';
 
                 if (devicePath && !virtual) {
-                    if (external && (!externalStates || !externalStates[targetValueName])) {
-                        this.log.error('Could not find external state mapping');
-                        continue;
-                    }
-                    if (!sourceValue) {
-                        this.log.error(
-                            `Could not find matching source device value for "${targetValueName}" (${deviceName})`,
-                        );
-                        continue;
-                    }
                     sourceValuePath = external ? externalStates![targetValueName] : `${devicePath}.${sourceValue}`;
                     actualValue = (await this.getForeignStateAsync(sourceValuePath))?.val ?? null;
                     this.#lastCurrentValues.set(sourceValuePath, actualValue);

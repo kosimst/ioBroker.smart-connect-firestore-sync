@@ -158,6 +158,16 @@ class SmartConnectFirestoreSync extends utils.Adapter {
                     this.log.error(`Could not find value mapping for ${deviceName} (${targetValueName}->${sourceValue})`);
                     throw new Error('Failed to create states');
                 }
+                if (!virtual &&
+                    ((!sourceValue && !external) || (external && (!externalStates || !externalStates[targetValueName])))) {
+                    if (optional) {
+                        this.log.info(`Skipping non-present optional state "${targetValueName}" (${deviceName})`);
+                    }
+                    else {
+                        this.log.error(`Could not find matching source device value for "${targetValueName}" (${deviceName})`);
+                    }
+                    continue;
+                }
                 await this.setObjectNotExistsAsync(`${valueBasePath}.value`, {
                     type: 'state',
                     common: {
@@ -197,14 +207,6 @@ class SmartConnectFirestoreSync extends utils.Adapter {
                 let actualValue = null;
                 let sourceValuePath = '';
                 if (devicePath && !virtual) {
-                    if (external && (!externalStates || !externalStates[targetValueName])) {
-                        this.log.error('Could not find external state mapping');
-                        continue;
-                    }
-                    if (!sourceValue) {
-                        this.log.error(`Could not find matching source device value for "${targetValueName}" (${deviceName})`);
-                        continue;
-                    }
                     sourceValuePath = external ? externalStates[targetValueName] : `${devicePath}.${sourceValue}`;
                     actualValue = (_d = (_c = (await this.getForeignStateAsync(sourceValuePath))) === null || _c === void 0 ? void 0 : _c.val) !== null && _d !== void 0 ? _d : null;
                     __classPrivateFieldGet(this, _lastCurrentValues).set(sourceValuePath, actualValue);
