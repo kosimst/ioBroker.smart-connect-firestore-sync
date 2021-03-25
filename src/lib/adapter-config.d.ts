@@ -4,8 +4,11 @@
 declare global {
     namespace ioBroker {
         interface AdapterConfig {
-            serviceAccount: string | firebase.ServiceAccount | null;
-            rooms: string[];
+            serviceAccount?: string | firebase.ServiceAccount;
+            rooms: {
+                name: string;
+                owners?: string[];
+            }[];
             devices: {
                 name: string;
                 path?: string;
@@ -26,19 +29,49 @@ declare global {
             targetTypes: {
                 [key: string]: { name: string; optional?: boolean; external?: boolean; virtual?: boolean }[];
             };
-            scenes: {
+            scenes?: {
                 name: string;
                 path?: string;
                 roomName: string;
             }[];
-            routines: { name: string; path?: string; roomName: string }[];
+            routines?: { name: string; path?: string; roomName: string }[];
             plugins: {
-                alarm: boolean;
-                gh: boolean;
-                geofencing: boolean;
-                scenes: boolean;
-                routines: boolean;
+                alarm?: boolean;
+                gh?:
+                    | false
+                    | {
+                          name: string;
+                          roomName: string;
+                      }[];
+                geofencing?: boolean;
+                scenes?: boolean;
+                routines?: boolean;
             };
+            /*users: {
+                email: string;
+                name: string;
+                avatar?: string;
+                admin?: boolean;
+                settings?: {
+                    favorites?: string[];
+                };
+                connections?: {
+                    spotify?: {
+                        token: string;
+                    };
+                    // TODO: Type Push Notifications Tokens correctly
+                    notifications?: {
+                        tokens: string[];
+                    };
+                };
+            }[];
+            apps: {
+                spotify: {
+                    clientId: string;
+                    clientSecret: string;
+                    scopes: string;
+                };
+            };*/
         }
     }
 }
