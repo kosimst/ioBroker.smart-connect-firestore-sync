@@ -28,16 +28,10 @@ var __classPrivateFieldSet = (this && this.__classPrivateFieldSet) || function (
     privateMap.set(receiver, value);
     return value;
 };
-var __classPrivateFieldGet = (this && this.__classPrivateFieldGet) || function (receiver, privateMap) {
-    if (!privateMap.has(receiver)) {
-        throw new TypeError("attempted to get private field on non-instance");
-    }
-    return privateMap.get(receiver);
-};
 var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
-var _lastCurrentValues, _firestore;
+var _firestore;
 Object.defineProperty(exports, "__esModule", { value: true });
 // The adapter-core module gives you access to the core ioBroker functions
 // you need to create an adapter
@@ -72,13 +66,13 @@ async function deleteQueryBatch(db, query, resolve) {
         deleteQueryBatch(db, query, resolve);
     });
 }
+const generateDeviceDocumentId = ({ name, roomName, sourceType, }) => `${name}_${roomName}_${sourceType}`;
 class SmartConnectFirestoreSync extends utils.Adapter {
     constructor(options = {}) {
         super({
             ...options,
             name: 'smart-connect-firestore-sync',
         });
-        _lastCurrentValues.set(this, new Map());
         _firestore.set(this, null);
         this.on('ready', this.onReady.bind(this));
         this.on('stateChange', this.onStateChange.bind(this));
@@ -114,7 +108,7 @@ class SmartConnectFirestoreSync extends utils.Adapter {
             await deleteCollection(firestore, 'states');
             await deleteCollection(firestore, 'rooms');
             for (const room of rooms) {
-                await firestore.collection('rooms').add({ name: room });
+                await firestore.collection('rooms').add(room);
             }
         }
         else {
@@ -192,29 +186,15 @@ class SmartConnectFirestoreSync extends utils.Adapter {
                     },
                     native: {},
                 });
-                await this.setObjectNotExistsAsync(`${valueBasePath}.previous`, {
-                    type: 'state',
-                    common: {
-                        name: 'Previous value',
-                        type: 'mixed',
-                        read: true,
-                        write: false,
-                        // TODO: Add more specific roles
-                        role: 'state',
-                    },
-                    native: {},
-                });
                 let actualValue = null;
                 let sourceValuePath = '';
                 if (devicePath && !virtual) {
                     sourceValuePath = external ? externalStates[targetValueName] : `${devicePath}.${sourceValue}`;
                     actualValue = (_d = (_c = (await this.getForeignStateAsync(sourceValuePath))) === null || _c === void 0 ? void 0 : _c.val) !== null && _d !== void 0 ? _d : null;
-                    __classPrivateFieldGet(this, _lastCurrentValues).set(sourceValuePath, actualValue);
                     await this.subscribeForeignStatesAsync(sourceValuePath);
                 }
                 this.log.info(`Created "${targetValueName}" with value ${actualValue}`);
                 await this.setStateAsync(`${valueBasePath}.value`, { val: actualValue, ack: true });
-                await this.setStateAsync(`${valueBasePath}.previous`, null);
                 await this.setStateAsync(`${valueBasePath}.timestamp`, { val: new Date().toUTCString(), ack: true });
                 if (firestore) {
                     await firestore.collection('states').add({
@@ -228,19 +208,22 @@ class SmartConnectFirestoreSync extends utils.Adapter {
                 }
             }
         }
-        firestore === null || firestore === void 0 ? void 0 : firestore.collection('states').onSnapshot((snap) => {
+        /*firestore?.collection('states').onSnapshot((snap) => {
             snap.docChanges().forEach(async (change) => {
-                var _a;
                 const { deviceName, roomName, name, value, deviceType } = change.doc.data();
                 const statePath = `states.${roomName}.${deviceType}.${deviceName}.${name}.value`;
+
                 this.log.info(`Firestore value "${name}" from ${deviceName} changed to ${value}`);
-                const oldState = (_a = (await this.getStateAsync(statePath))) === null || _a === void 0 ? void 0 : _a.val;
-                if (oldState == value)
-                    return;
+
+                const oldState = (await this.getStateAsync(statePath))?.val;
+
+                if (oldState == value) return;
+
                 await this.setStateAsync(statePath, { val: value, ack: false, c: 'firestore-update' });
             });
         });
-        await this.subscribeStatesAsync('states.*');
+
+        await this.subscribeStatesAsync('states.*');*/
     }
     /**
      * Is called when adapter shuts down - callback has to be called under any circumstances!
@@ -254,34 +237,21 @@ class SmartConnectFirestoreSync extends utils.Adapter {
             callback();
         }
     }
-    // If you need to react to object changes, uncomment the following block and the corresponding line in the constructor.
-    // You also need to subscribe to the objects with `this.subscribeObjects`, similar to `this.subscribeStates`.
-    // /**
-    //  * Is called if a subscribed object changes
-    //  */
-    // private onObjectChange(id: string, obj: ioBroker.Object | null | undefined): void {
-    //     if (obj) {
-    //         // The object was changed
-    //         this.log.info(`object ${id} changed: ${JSON.stringify(obj)}`);
-    //     } else {
-    //         // The object was deleted
-    //         this.log.info(`object ${id} deleted`);
-    //     }
-    // }
     /**
      * Is called if a subscribed state changes
      */
     async onStateChange(id, state) {
-        var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k, _l, _m, _o, _p;
+        var _a, _b, _c, _d, _e, _f;
         if (!state)
             return;
         this.log.info(`State "${id}" changed by ${state.from}`);
         this.log.info(`Full state: ${JSON.stringify(state)}`);
-        const isSelfModified = state.from.includes('smart-connect-firestore-sync');
-        if (isSelfModified && state.ack) {
+        // const isSelfModified = state.from.includes('smart-connect-firestore-sync');
+        const isForeign = !id.includes('smart-connect-firestore-sync');
+        // Ignore already synced state changes
+        if (!isForeign && state.ack) {
             return;
         }
-        const isForeign = !id.includes('smart-connect-firestore-sync');
         if (isForeign) {
             const externalDevice = this.config.devices.find(({ externalStates }) => externalStates && Object.values(externalStates).find((externalPath) => id.includes(externalPath)));
             const defaultDevice = this.config.devices.find(({ path }) => path && id.includes(path));
@@ -319,33 +289,34 @@ class SmartConnectFirestoreSync extends utils.Adapter {
                 }
                 targetPath = `states.${device.roomName}.${sourceTypeDevice.targetType}.${device.name}.${targetValue}`;
             }
-            const previousValue = (_c = (await this.getStateAsync(`${targetPath}.value`))) === null || _c === void 0 ? void 0 : _c.val;
-            await this.setStateAsync(`${targetPath}.value`, { val: (_d = state.val) !== null && _d !== void 0 ? _d : null, ack: true });
-            await this.setStateAsync(`${targetPath}.previous`, { val: previousValue !== null && previousValue !== void 0 ? previousValue : null, ack: true });
+            await this.setStateAsync(`${targetPath}.value`, { val: (_c = state.val) !== null && _c !== void 0 ? _c : null, ack: true });
             await this.setStateAsync(`${targetPath}.timestamp`, { val: new Date().toUTCString(), ack: true });
-            if (__classPrivateFieldGet(this, _firestore)) {
-                const doc = await __classPrivateFieldGet(this, _firestore).collection('states')
+            /*if (this.#firestore) {
+                const doc = await this.#firestore
+                    .collection('states')
                     .where('deviceName', '==', device.name)
                     .where('roomName', '==', device.roomName)
                     .where('name', '==', targetValue)
                     .where('deviceType', '==', sourceTypeDevice.targetType)
                     .limit(1)
                     .get();
+
                 if (doc.docs.length && doc.docs[0].exists) {
                     const docRef = doc.docs[0].ref;
-                    const oldValue = (_e = (await docRef.get()).data()) === null || _e === void 0 ? void 0 : _e.value;
-                    if ((_f = oldValue != state.val) !== null && _f !== void 0 ? _f : null) {
-                        docRef.update({ value: (_g = state.val) !== null && _g !== void 0 ? _g : null, timestamp: new Date().toUTCString() });
+                    const oldValue = (await docRef.get()).data()?.value;
+
+                    if (oldValue != state.val ?? null) {
+                        docRef.update({ value: state.val ?? null, timestamp: new Date().toUTCString() });
                     }
+                } else {
+                    this.log.warn(
+                        `Could not find firestore value for ${device.name} in ${device.roomName} (${targetValue} of ${sourceTypeDevice.targetType})`,
+                    );
                 }
-                else {
-                    this.log.warn(`Could not find firestore value for ${device.name} in ${device.roomName} (${targetValue} of ${sourceTypeDevice.targetType})`);
-                }
-            }
+            }*/
         }
         else {
             const [, , , roomName, targetDeviceType, deviceName, valueName, valueProperty] = id.split('.');
-            const devicePath = `states.${roomName}.${targetDeviceType}.${deviceName}.${valueName}`;
             if (valueProperty !== 'value')
                 return;
             try {
@@ -370,32 +341,23 @@ class SmartConnectFirestoreSync extends utils.Adapter {
                     this.log.error('No source device type found for state change');
                     return;
                 }
-                const sourceDeviceValue = ((_h = sourceDeviceType.values.find(({ targetValueName }) => targetValueName === valueName)) === null || _h === void 0 ? void 0 : _h.sourceValueName) || valueName;
+                const sourceDeviceValue = ((_d = sourceDeviceType.values.find(({ targetValueName }) => targetValueName === valueName)) === null || _d === void 0 ? void 0 : _d.sourceValueName) || valueName;
                 if (!sourceDeviceValue) {
                     this.log.error('No value mapping found for state change');
                     return;
                 }
                 const sourceDevicePath = isExternal
-                    ? ((_j = Object.entries(device.externalStates).find(([key]) => key === valueName)) === null || _j === void 0 ? void 0 : _j[1]) || ''
+                    ? ((_e = Object.entries(device.externalStates).find(([key]) => key === valueName)) === null || _e === void 0 ? void 0 : _e[1]) || ''
                     : `${sourceDeviceBasePath}.${sourceDeviceValue}`;
-                await this.setForeignStateAsync(sourceDevicePath, { val: (_k = state.val) !== null && _k !== void 0 ? _k : null });
-                await this.setStateAsync(`${devicePath}.timestamp`, { ack: true, val: new Date().toUTCString() });
-                await this.setStateAsync(`${devicePath}.previous`, {
-                    val: (_l = __classPrivateFieldGet(this, _lastCurrentValues).get(sourceDevicePath)) !== null && _l !== void 0 ? _l : null,
-                    ack: true,
-                });
-                __classPrivateFieldGet(this, _lastCurrentValues).set(sourceDevicePath, (_m = state.val) !== null && _m !== void 0 ? _m : null);
-                await this.setStateAsync(`${devicePath}.value`, { val: (_o = state.val) !== null && _o !== void 0 ? _o : null, ack: true });
+                await this.setForeignStateAsync(sourceDevicePath, { val: (_f = state.val) !== null && _f !== void 0 ? _f : null });
             }
             catch (e) {
                 this.log.warn(e.message);
-                const prevValue = (_p = (await this.getStateAsync(`${devicePath}.previous`))) === null || _p === void 0 ? void 0 : _p.val;
-                await this.setStateAsync(`${devicePath}.value`, { ack: true, val: prevValue !== null && prevValue !== void 0 ? prevValue : null });
             }
         }
     }
 }
-_lastCurrentValues = new WeakMap(), _firestore = new WeakMap();
+_firestore = new WeakMap();
 if (module.parent) {
     // Export the constructor in compact mode
     module.exports = (options) => new SmartConnectFirestoreSync(options);
