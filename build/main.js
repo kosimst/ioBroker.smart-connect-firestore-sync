@@ -221,9 +221,8 @@ class SmartConnectFirestoreSync extends utils.Adapter {
 
                 await this.setStateAsync(statePath, { val: value, ack: false, c: 'firestore-update' });
             });
-        });
-
-        await this.subscribeStatesAsync('states.*');*/
+        });*/
+        await this.subscribeStatesAsync('states.*');
     }
     /**
      * Is called when adapter shuts down - callback has to be called under any circumstances!
