@@ -95,7 +95,7 @@ class SmartConnectFirestoreSync extends utils.Adapter {
 
             for (const room of rooms) {
                 try {
-                    await firestore.collection('rooms').add(room);
+                    await firestore.collection('rooms').add({ name: room });
                 } catch {
                     this.log.error('Failed to add room to firestore:');
                     this.log.error(JSON.stringify(room));

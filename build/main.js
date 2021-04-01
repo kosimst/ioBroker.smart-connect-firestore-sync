@@ -111,7 +111,7 @@ class SmartConnectFirestoreSync extends utils.Adapter {
             await deleteCollection(firestore, 'rooms');
             for (const room of rooms) {
                 try {
-                    await firestore.collection('rooms').add(room);
+                    await firestore.collection('rooms').add({ name: room });
                 }
                 catch (_f) {
                     this.log.error('Failed to add room to firestore:');
