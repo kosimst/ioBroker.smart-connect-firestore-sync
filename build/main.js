@@ -80,11 +80,11 @@ class SmartConnectFirestoreSync extends utils.Adapter {
      * Is called when databases are connected and adapter received configuration.
      */
     async onReady() {
-        var _a, _b, _c, _d, _e, _f;
+        var _a, _b, _c, _d, _e;
         const { serviceAccount, jsonOverwrite } = this.config;
         if (!serviceAccount) {
             this.log.error('No service account set, exiting...');
-            return;
+            throw new Error('No service account provided');
         }
         try {
             firebase_admin_1.default.initializeApp({
@@ -125,7 +125,6 @@ class SmartConnectFirestoreSync extends utils.Adapter {
                 catch (e) {
                     this.log.error(`Failed to add doc with name "${name}"`);
                     this.log.error((e === null || e === void 0 ? void 0 : e.message) || e);
-                    (_b = this.stop) === null || _b === void 0 ? void 0 : _b.call(this);
                     return;
                 }
             }
@@ -166,7 +165,7 @@ class SmartConnectFirestoreSync extends utils.Adapter {
                 try {
                     await firestore.collection('rooms').add({ name: room });
                 }
-                catch (_g) {
+                catch (_f) {
                     this.log.error('Failed to add room to firestore:');
                     this.log.error(JSON.stringify(room));
                 }
@@ -183,7 +182,7 @@ class SmartConnectFirestoreSync extends utils.Adapter {
                 continue;
             }
             const { targetType: deviceTargetType, values: sourceValues } = deviceSourceObject;
-            const targetValues = (_c = Object.entries(targetTypes).find(([key]) => key === deviceTargetType)) === null || _c === void 0 ? void 0 : _c[1];
+            const targetValues = (_b = Object.entries(targetTypes).find(([key]) => key === deviceTargetType)) === null || _b === void 0 ? void 0 : _b[1];
             if (!targetValues) {
                 continue;
             }
@@ -200,7 +199,7 @@ class SmartConnectFirestoreSync extends utils.Adapter {
                 try {
                     await firestore.collection('devices').add(deviceDocData);
                 }
-                catch (_h) {
+                catch (_g) {
                     this.log.error('Failed to add device to firestore:');
                     this.log.error(JSON.stringify(deviceDocData));
                 }
@@ -209,7 +208,7 @@ class SmartConnectFirestoreSync extends utils.Adapter {
                 const { name: targetValueName, external = false, optional = false, virtual = false } = targetValueEntry;
                 // Create states in adapter
                 const valueBasePath = `${targetDeviceBasePath}.${targetValueName}`;
-                const sourceValue = (_d = sourceValues.find(({ targetValueName: target }) => targetValueName === target)) === null || _d === void 0 ? void 0 : _d.sourceValueName;
+                const sourceValue = (_c = sourceValues.find(({ targetValueName: target }) => targetValueName === target)) === null || _c === void 0 ? void 0 : _c.sourceValueName;
                 if (!sourceValue && !optional && !virtual) {
                     throw new Error('Failed to create states');
                 }
@@ -245,7 +244,7 @@ class SmartConnectFirestoreSync extends utils.Adapter {
                 let sourceValuePath = '';
                 if (devicePath && !virtual) {
                     sourceValuePath = external ? externalStates[targetValueName] : `${devicePath}.${sourceValue}`;
-                    actualValue = (_f = (_e = (await this.getForeignStateAsync(sourceValuePath))) === null || _e === void 0 ? void 0 : _e.val) !== null && _f !== void 0 ? _f : null;
+                    actualValue = (_e = (_d = (await this.getForeignStateAsync(sourceValuePath))) === null || _d === void 0 ? void 0 : _d.val) !== null && _e !== void 0 ? _e : null;
                     await this.subscribeForeignStatesAsync(sourceValuePath);
                 }
                 await this.setStateAsync(`${valueBasePath}.value`, { val: actualValue, ack: true });
@@ -262,7 +261,7 @@ class SmartConnectFirestoreSync extends utils.Adapter {
                     try {
                         await firestore.collection('states').add(stateDocData);
                     }
-                    catch (_j) {
+                    catch (_h) {
                         this.log.error('Failed to add state to firestore:');
                         this.log.error(JSON.stringify(stateDocData));
                     }

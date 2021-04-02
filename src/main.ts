@@ -64,7 +64,7 @@ class SmartConnectFirestoreSync extends utils.Adapter {
 
         if (!serviceAccount) {
             this.log.error('No service account set, exiting...');
-            return;
+            throw new Error('No service account provided');
         }
 
         try {
@@ -111,7 +111,6 @@ class SmartConnectFirestoreSync extends utils.Adapter {
                 } catch (e) {
                     this.log.error(`Failed to add doc with name "${name}"`);
                     this.log.error(e?.message || e);
-                    this.stop?.call(this);
                     return;
                 }
             }
