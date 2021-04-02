@@ -26,7 +26,7 @@
 
                 const serviceAccountInput = document.getElementById('service-account');
                 serviceAccountInput.value = JSON.stringify(settings.serviceAccount);
-                serviceAccountInput.onkeypress = ({ target: { value } }) => {
+                serviceAccountInput.onchange = ({ target: { value } }) => {
                     try {
                         settings.serviceAccount = JSON.parse(value);
                         onChange();
@@ -36,7 +36,7 @@
                 };
 
                 const jsonInput = document.getElementById('json-overwrite');
-                jsonInput.onkeypress = ({ target: { value } }) => {
+                jsonInput.onchange = ({ target: { value } }) => {
                     try {
                         settings.jsonOverwrite = JSON.parse(value);
                         onChange();
