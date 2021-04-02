@@ -40,8 +40,6 @@ declare global {
     namespace ioBroker {
         interface AdapterConfig {
             serviceAccount: firebase.ServiceAccount;
-            jsonOverwrite?: UsedConfig;
-            usedConfig: UsedConfig;
         }
     }
 }
