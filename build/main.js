@@ -108,7 +108,7 @@ class SmartConnectFirestoreSync extends utils.Adapter {
             const { sourceTypes, targetTypes } = jsonOverwrite;
             for (const [name, sourceType] of Object.entries(sourceTypes)) {
                 try {
-                    await sourceTypeRef.doc(name).set({ entries: sourceType });
+                    await sourceTypeRef.doc(name).set(sourceType);
                 }
                 catch (e) {
                     this.log.error(`Failed to add doc with name "${name}"`);
@@ -140,13 +140,14 @@ class SmartConnectFirestoreSync extends utils.Adapter {
             }
             const sourceTypes = {};
             for (const doc of (await sourceTypeRef.get()).docs) {
-                sourceTypes[doc.id] = doc.data().entries;
+                sourceTypes[doc.id] = doc.data();
             }
             builtConfig.devices = devices;
             builtConfig.rooms = rooms;
             builtConfig.sourceTypes = sourceTypes;
             builtConfig.targetTypes = targetTypes;
             this.log.info(JSON.stringify(targetTypes));
+            this.log.info(JSON.stringify(sourceTypes));
         }
         const usedConfig = builtConfig;
         const { rooms, devices, sourceTypes, targetTypes } = usedConfig;
@@ -173,6 +174,7 @@ class SmartConnectFirestoreSync extends utils.Adapter {
             }
             const { targetType: deviceTargetType, values: sourceValues } = deviceSourceObject;
             const targetValues = (_b = Object.entries(targetTypes).find(([key]) => key === deviceTargetType)) === null || _b === void 0 ? void 0 : _b[1];
+            this.log.info(JSON.stringify(targetValues));
             if (!targetValues) {
                 continue;
             }
@@ -204,6 +206,8 @@ class SmartConnectFirestoreSync extends utils.Adapter {
                 }
                 if (!virtual &&
                     ((!sourceValue && !external) || (external && (!externalStates || !externalStates[targetValueName])))) {
+                    this.log.info('Skip');
+                    this.log.info(JSON.stringify(targetValueEntry));
                     continue;
                 }
                 await this.setObjectNotExistsAsync(`${valueBasePath}.value`, {
@@ -295,6 +299,8 @@ class SmartConnectFirestoreSync extends utils.Adapter {
      */
     async onStateChange(id, state) {
         var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k;
+        if (!this.config.usedConfig)
+            return;
         if (!state)
             return;
         const isForeign = !id.includes('smart-connect-firestore-sync');

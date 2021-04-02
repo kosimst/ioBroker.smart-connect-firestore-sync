@@ -95,7 +95,7 @@ class SmartConnectFirestoreSync extends utils.Adapter {
 
             for (const [name, sourceType] of Object.entries(sourceTypes)) {
                 try {
-                    await sourceTypeRef.doc(name).set({ entries: sourceType });
+                    await sourceTypeRef.doc(name).set(sourceType);
                 } catch (e) {
                     this.log.error(`Failed to add doc with name "${name}"`);
                     this.log.error(e?.message || e);
@@ -145,7 +145,7 @@ class SmartConnectFirestoreSync extends utils.Adapter {
                 };
             } = {};
             for (const doc of (await sourceTypeRef.get()).docs) {
-                sourceTypes[doc.id] = doc.data().entries as {
+                sourceTypes[doc.id] = doc.data() as {
                     targetType: string;
                     values: {
                         targetValueName: string;
@@ -160,6 +160,7 @@ class SmartConnectFirestoreSync extends utils.Adapter {
             builtConfig.targetTypes = targetTypes;
 
             this.log.info(JSON.stringify(targetTypes));
+            this.log.info(JSON.stringify(sourceTypes));
         }
 
         const usedConfig = builtConfig as UsedConfig;
@@ -200,6 +201,8 @@ class SmartConnectFirestoreSync extends utils.Adapter {
 
             const targetValues = Object.entries(targetTypes).find(([key]) => key === deviceTargetType)?.[1];
 
+            this.log.info(JSON.stringify(targetValues));
+
             if (!targetValues) {
                 continue;
             }
@@ -239,6 +242,8 @@ class SmartConnectFirestoreSync extends utils.Adapter {
                     !virtual &&
                     ((!sourceValue && !external) || (external && (!externalStates || !externalStates[targetValueName])))
                 ) {
+                    this.log.info('Skip');
+                    this.log.info(JSON.stringify(targetValueEntry));
                     continue;
                 }
 
@@ -338,6 +343,7 @@ class SmartConnectFirestoreSync extends utils.Adapter {
      * Is called if a subscribed state changes
      */
     private async onStateChange(id: string, state: ioBroker.State | null | undefined): Promise<void> {
+        if (!this.config.usedConfig) return;
         if (!state) return;
 
         const isForeign = !id.includes('smart-connect-firestore-sync');
