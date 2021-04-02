@@ -37,7 +37,6 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 var _firestore;
 Object.defineProperty(exports, "__esModule", { value: true });
 const utils = __importStar(require("@iobroker/adapter-core"));
-const fast_deep_equal_1 = __importDefault(require("fast-deep-equal"));
 const firebase_admin_1 = __importDefault(require("firebase-admin"));
 async function deleteCollection(db, collectionPath, batchSize = 16) {
     const collectionRef = db.collection(collectionPath);
@@ -147,17 +146,6 @@ class SmartConnectFirestoreSync extends utils.Adapter {
             builtConfig.rooms = rooms;
             builtConfig.sourceTypes = sourceTypes;
             builtConfig.targetTypes = targetTypes;
-            const configHasChanged = !fast_deep_equal_1.default(builtConfig, this.config.usedConfig);
-            if (configHasChanged) {
-                this.log.info(String(fast_deep_equal_1.default(builtConfig, this.config.usedConfig)));
-                this.log.info('Config changed');
-                this.log.info(JSON.stringify(builtConfig));
-                this.log.info(JSON.stringify(this.config.usedConfig));
-                this.updateConfig({
-                    usedConfig: builtConfig,
-                });
-                return;
-            }
         }
         const usedConfig = builtConfig;
         const { rooms, devices, sourceTypes, targetTypes } = usedConfig;

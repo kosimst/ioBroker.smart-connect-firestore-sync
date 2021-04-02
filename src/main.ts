@@ -1,5 +1,4 @@
 import * as utils from '@iobroker/adapter-core';
-import deepEqual from 'fast-deep-equal';
 import firebase from 'firebase-admin';
 import { Device, FirestoreDevice, FirestoreRoom, Room, UsedConfig } from './lib/adapter-config';
 
@@ -159,20 +158,6 @@ class SmartConnectFirestoreSync extends utils.Adapter {
             builtConfig.rooms = rooms;
             builtConfig.sourceTypes = sourceTypes;
             builtConfig.targetTypes = targetTypes;
-
-            const configHasChanged = !deepEqual(builtConfig, this.config.usedConfig);
-            if (configHasChanged) {
-                this.log.info(String(deepEqual(builtConfig, this.config.usedConfig)));
-                this.log.info('Config changed');
-                this.log.info(JSON.stringify(builtConfig));
-                this.log.info(JSON.stringify(this.config.usedConfig));
-
-                this.updateConfig({
-                    usedConfig: builtConfig as Required<UsedConfig>,
-                });
-
-                return;
-            }
         }
 
         const usedConfig = builtConfig as UsedConfig;
