@@ -93,10 +93,12 @@ class SmartConnectFirestoreSync extends utils.Adapter {
         const usedConfig = builtConfig;
         __classPrivateFieldSet(this, _usedConfig, usedConfig);
         const oldStates = await this.getStatesAsync('states.*');
+        this.log.info('Deleting old states...');
         for (const [path] of Object.entries(oldStates || {})) {
             const usedPath = path.split('0.')[1];
             await this.delObjectAsync(usedPath);
         }
+        this.log.info(`Iterating over ${devices.length} devices..`);
         for (const { name: deviceName, roomName: deviceRoomName, sourceType: deviceSourceType, path: devicePath, externalStates, } of devices) {
             const deviceSourceObject = sourceTypes[deviceSourceType];
             if (!deviceSourceObject) {
@@ -108,6 +110,7 @@ class SmartConnectFirestoreSync extends utils.Adapter {
                 continue;
             }
             const targetDeviceBasePath = `states.${deviceRoomName}.${deviceTargetType}.${deviceName}`;
+            this.log.info(`${targetValues.length} values for ${deviceName}...`);
             for (const targetValueEntry of targetValues) {
                 const { name: targetValueName, external = false, optional = false, virtual = false } = targetValueEntry;
                 // Create states in adapter
@@ -120,6 +123,7 @@ class SmartConnectFirestoreSync extends utils.Adapter {
                     ((!sourceValue && !external) || (external && (!externalStates || !externalStates[targetValueName])))) {
                     continue;
                 }
+                this.log.info(`Creating objects...`);
                 await this.setObjectNotExistsAsync(`${valueBasePath}.value`, {
                     type: 'state',
                     common: {
