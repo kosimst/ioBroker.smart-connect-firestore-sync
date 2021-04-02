@@ -158,6 +158,8 @@ class SmartConnectFirestoreSync extends utils.Adapter {
             builtConfig.rooms = rooms;
             builtConfig.sourceTypes = sourceTypes;
             builtConfig.targetTypes = targetTypes;
+
+            this.log.info(JSON.stringify(targetTypes));
         }
 
         const usedConfig = builtConfig as UsedConfig;
