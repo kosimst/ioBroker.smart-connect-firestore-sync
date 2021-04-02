@@ -179,7 +179,7 @@ class SmartConnectFirestoreSync extends utils.Adapter {
             }
         }
 
-        firestore?.collection('states').onSnapshot((snap) => {
+        firestore.collection('states').onSnapshot((snap) => {
             snap.docChanges().forEach(async (change) => {
                 const { deviceName, roomName, name, value, deviceType } = change.doc.data();
                 const statePath = `states.${roomName}.${deviceType}.${deviceName}.${name}.value`;
@@ -191,6 +191,21 @@ class SmartConnectFirestoreSync extends utils.Adapter {
                 await this.setStateAsync(statePath, { val: value, ack: false });
             });
         });
+
+        await firestore.collection('settings').doc('firestore-sync').update({ restart: 0 });
+
+        firestore
+            .collection('settings')
+            .doc('firestore-sync')
+            .onSnapshot(async (doc) => {
+                const { restart } = doc.data() as any;
+
+                if (Date.now() - restart > 1000) return;
+
+                await doc.ref.update({ restart: -1 });
+
+                await this.restart();
+            });
 
         await this.subscribeStatesAsync('states.*');
     }
