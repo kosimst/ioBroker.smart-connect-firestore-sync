@@ -38,6 +38,34 @@ var _firestore, _usedConfig;
 Object.defineProperty(exports, "__esModule", { value: true });
 const utils = __importStar(require("@iobroker/adapter-core"));
 const firebase_admin_1 = __importDefault(require("firebase-admin"));
+const getStatePath = (roomName, deviceType, deviceName, valueName) => `${roomName}_${deviceType}_${deviceName}_${valueName}`;
+async function deleteCollection(firestore, collectionPath, batchSize = 25) {
+    const collectionRef = firestore.collection(collectionPath);
+    const query = collectionRef.orderBy('__name__').limit(batchSize);
+    return new Promise((resolve, reject) => {
+        deleteQueryBatch(firestore, query, resolve).catch(reject);
+    });
+}
+async function deleteQueryBatch(firestore, query, resolve) {
+    const snapshot = await query.get();
+    const batchSize = snapshot.size;
+    if (batchSize === 0) {
+        // When there are no documents left, we are done
+        resolve();
+        return;
+    }
+    // Delete documents in a batch
+    const batch = firestore.batch();
+    snapshot.docs.forEach((doc) => {
+        batch.delete(doc.ref);
+    });
+    await batch.commit();
+    // Recurse on the next process tick, to avoid
+    // exploding the stack.
+    process.nextTick(() => {
+        deleteQueryBatch(firestore, query, resolve);
+    });
+}
 class SmartConnectFirestoreSync extends utils.Adapter {
     constructor(options = {}) {
         super({
@@ -70,6 +98,13 @@ class SmartConnectFirestoreSync extends utils.Adapter {
         }
         const firestore = firebase_admin_1.default.firestore();
         __classPrivateFieldSet(this, _firestore, firestore);
+        try {
+            await deleteCollection(firestore, 'states');
+        }
+        catch (e) {
+            this.log.error('Failed to delete old state collection');
+            this.log.error((e === null || e === void 0 ? void 0 : e.message) || e);
+        }
         const builtConfig = {};
         const targetTypeRef = firestore.collection('devices').doc('definitions').collection('targetTypes');
         const sourceTypeRef = firestore.collection('devices').doc('definitions').collection('sourceTypes');
@@ -154,6 +189,17 @@ class SmartConnectFirestoreSync extends utils.Adapter {
                 }
                 await this.setStateAsync(`${valueBasePath}.value`, { val: actualValue, ack: true });
                 await this.setStateAsync(`${valueBasePath}.timestamp`, { val: new Date().toUTCString(), ack: true });
+                await firestore
+                    .collection('states')
+                    .doc(getStatePath(deviceRoomName, deviceTargetType, deviceName, targetValueName))
+                    .set({
+                    deviceName,
+                    roomName: deviceRoomName,
+                    name: targetValueName,
+                    value: actualValue,
+                    deviceType: deviceTargetType,
+                    timestamp: new Date().toUTCString(),
+                });
             }
         }
         firestore.collection('states').onSnapshot((snap) => {
@@ -199,6 +245,8 @@ class SmartConnectFirestoreSync extends utils.Adapter {
         var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k;
         if (!__classPrivateFieldGet(this, _usedConfig))
             return;
+        if (!__classPrivateFieldGet(this, _firestore))
+            return;
         if (!state)
             return;
         const isForeign = !id.includes('smart-connect-firestore-sync');
@@ -240,26 +288,16 @@ class SmartConnectFirestoreSync extends utils.Adapter {
             }
             await this.setStateAsync(`${targetPath}.value`, { val: (_c = state.val) !== null && _c !== void 0 ? _c : null, ack: true });
             await this.setStateAsync(`${targetPath}.timestamp`, { val: new Date().toUTCString(), ack: true });
-            if (__classPrivateFieldGet(this, _firestore)) {
-                const doc = await __classPrivateFieldGet(this, _firestore).collection('states')
-                    .where('deviceName', '==', device.name)
-                    .where('roomName', '==', device.roomName)
-                    .where('name', '==', targetValue)
-                    .where('deviceType', '==', sourceTypeDevice.targetType)
-                    .limit(1)
-                    .get();
-                if (doc.docs.length && doc.docs[0].exists) {
-                    const docRef = doc.docs[0].ref;
-                    const oldValue = (_d = (await docRef.get()).data()) === null || _d === void 0 ? void 0 : _d.value;
-                    if ((_e = oldValue != state.val) !== null && _e !== void 0 ? _e : null) {
-                        try {
-                            await docRef.update({ value: (_f = state.val) !== null && _f !== void 0 ? _f : null, timestamp: new Date().toUTCString() });
-                        }
-                        catch (_l) {
-                            this.log.error('Failed to update state in firestore:');
-                            this.log.error(JSON.stringify({ value: (_g = state.val) !== null && _g !== void 0 ? _g : null, timestamp: new Date().toUTCString() }));
-                        }
-                    }
+            const doc = await __classPrivateFieldGet(this, _firestore).collection('states')
+                .doc(getStatePath(device.roomName, sourceTypeDevice.targetType, device.name, targetValue));
+            const oldValue = (_d = (await doc.get()).data()) === null || _d === void 0 ? void 0 : _d.value;
+            if ((_e = oldValue != state.val) !== null && _e !== void 0 ? _e : null) {
+                try {
+                    await doc.update({ value: (_f = state.val) !== null && _f !== void 0 ? _f : null, timestamp: new Date().toUTCString() });
+                }
+                catch (_l) {
+                    this.log.error('Failed to update state in firestore:');
+                    this.log.error(JSON.stringify({ value: (_g = state.val) !== null && _g !== void 0 ? _g : null, timestamp: new Date().toUTCString() }));
                 }
             }
         }

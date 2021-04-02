@@ -2,6 +2,50 @@ import * as utils from '@iobroker/adapter-core';
 import firebase from 'firebase-admin';
 import { Device, FirestoreDevice, FirestoreRoom, Room, UsedConfig } from './lib/adapter-config';
 
+const getStatePath = (roomName: string, deviceType: string, deviceName: string, valueName: string): string =>
+    `${roomName}_${deviceType}_${deviceName}_${valueName}`;
+
+async function deleteCollection(
+    firestore: firebase.firestore.Firestore,
+    collectionPath: string,
+    batchSize = 25,
+): Promise<unknown> {
+    const collectionRef = firestore.collection(collectionPath);
+    const query = collectionRef.orderBy('__name__').limit(batchSize);
+
+    return new Promise((resolve, reject) => {
+        deleteQueryBatch(firestore, query, resolve as () => void).catch(reject);
+    });
+}
+
+async function deleteQueryBatch(
+    firestore: firebase.firestore.Firestore,
+    query: firebase.firestore.Query,
+    resolve: () => void,
+): Promise<void> {
+    const snapshot = await query.get();
+
+    const batchSize = snapshot.size;
+    if (batchSize === 0) {
+        // When there are no documents left, we are done
+        resolve();
+        return;
+    }
+
+    // Delete documents in a batch
+    const batch = firestore.batch();
+    snapshot.docs.forEach((doc) => {
+        batch.delete(doc.ref);
+    });
+    await batch.commit();
+
+    // Recurse on the next process tick, to avoid
+    // exploding the stack.
+    process.nextTick(() => {
+        deleteQueryBatch(firestore, query, resolve);
+    });
+}
+
 class SmartConnectFirestoreSync extends utils.Adapter {
     #firestore: firebase.firestore.Firestore | null = null;
     #usedConfig: UsedConfig | null = null;
@@ -37,6 +81,13 @@ class SmartConnectFirestoreSync extends utils.Adapter {
 
         const firestore = firebase.firestore();
         this.#firestore = firestore;
+
+        try {
+            await deleteCollection(firestore, 'states');
+        } catch (e) {
+            this.log.error('Failed to delete old state collection');
+            this.log.error(e?.message || e);
+        }
 
         const builtConfig: Partial<UsedConfig> = {};
 
@@ -176,6 +227,18 @@ class SmartConnectFirestoreSync extends utils.Adapter {
 
                 await this.setStateAsync(`${valueBasePath}.value`, { val: actualValue, ack: true });
                 await this.setStateAsync(`${valueBasePath}.timestamp`, { val: new Date().toUTCString(), ack: true });
+
+                await firestore
+                    .collection('states')
+                    .doc(getStatePath(deviceRoomName, deviceTargetType, deviceName, targetValueName))
+                    .set({
+                        deviceName,
+                        roomName: deviceRoomName,
+                        name: targetValueName,
+                        value: actualValue,
+                        deviceType: deviceTargetType,
+                        timestamp: new Date().toUTCString(),
+                    });
             }
         }
 
@@ -226,6 +289,7 @@ class SmartConnectFirestoreSync extends utils.Adapter {
      */
     private async onStateChange(id: string, state: ioBroker.State | null | undefined): Promise<void> {
         if (!this.#usedConfig) return;
+        if (!this.#firestore) return;
         if (!state) return;
 
         const isForeign = !id.includes('smart-connect-firestore-sync');
@@ -281,30 +345,18 @@ class SmartConnectFirestoreSync extends utils.Adapter {
             await this.setStateAsync(`${targetPath}.value`, { val: state.val ?? null, ack: true });
             await this.setStateAsync(`${targetPath}.timestamp`, { val: new Date().toUTCString(), ack: true });
 
-            if (this.#firestore) {
-                const doc = await this.#firestore
-                    .collection('states')
-                    .where('deviceName', '==', device.name)
-                    .where('roomName', '==', device.roomName)
-                    .where('name', '==', targetValue)
-                    .where('deviceType', '==', sourceTypeDevice.targetType)
-                    .limit(1)
-                    .get();
+            const doc = await this.#firestore
+                .collection('states')
+                .doc(getStatePath(device.roomName, sourceTypeDevice.targetType, device.name, targetValue));
 
-                if (doc.docs.length && doc.docs[0].exists) {
-                    const docRef = doc.docs[0].ref;
-                    const oldValue = (await docRef.get()).data()?.value;
+            const oldValue = (await doc.get()).data()?.value;
 
-                    if (oldValue != state.val ?? null) {
-                        try {
-                            await docRef.update({ value: state.val ?? null, timestamp: new Date().toUTCString() });
-                        } catch {
-                            this.log.error('Failed to update state in firestore:');
-                            this.log.error(
-                                JSON.stringify({ value: state.val ?? null, timestamp: new Date().toUTCString() }),
-                            );
-                        }
-                    }
+            if (oldValue != state.val ?? null) {
+                try {
+                    await doc.update({ value: state.val ?? null, timestamp: new Date().toUTCString() });
+                } catch {
+                    this.log.error('Failed to update state in firestore:');
+                    this.log.error(JSON.stringify({ value: state.val ?? null, timestamp: new Date().toUTCString() }));
                 }
             }
         } else {
