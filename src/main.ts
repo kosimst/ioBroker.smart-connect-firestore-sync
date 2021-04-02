@@ -1,14 +1,7 @@
-/*
- * Created with @iobroker/create-adapter v1.31.0
- */
-
-// The adapter-core module gives you access to the core ioBroker functions
-// you need to create an adapter
 import * as utils from '@iobroker/adapter-core';
+import deepEqual from 'fast-deep-equal';
 import firebase from 'firebase-admin';
-
-// Load your modules here, e.g.:
-// import * as fs from "fs";
+import { Device, FirestoreDevice, FirestoreRoom, Room, UsedConfig } from './lib/adapter-config';
 
 async function deleteCollection(
     db: firebase.firestore.Firestore,
@@ -37,15 +30,12 @@ async function deleteQueryBatch(
         return;
     }
 
-    // Delete documents in a batch
     const batch = db.batch();
     snapshot.docs.forEach((doc) => {
         batch.delete(doc.ref);
     });
     await batch.commit();
 
-    // Recurse on the next process tick, to avoid
-    // exploding the stack.
     process.nextTick(() => {
         deleteQueryBatch(db, query, resolve);
     });
@@ -70,29 +60,125 @@ class SmartConnectFirestoreSync extends utils.Adapter {
      * Is called when databases are connected and adapter received configuration.
      */
     private async onReady(): Promise<void> {
-        const { devices, sourceTypes, serviceAccount, rooms } = this.config;
+        const { serviceAccount, jsonOverwrite } = this.config;
 
-        let firebaseInit = false;
-        let firestore: firebase.firestore.Firestore | null = null;
-
-        if (serviceAccount) {
-            try {
-                firebase.initializeApp({
-                    credential: firebase.credential.cert(serviceAccount),
-                    databaseURL: 'https://kosimst-smart-home.firebaseio.com',
-                });
-                firebaseInit = true;
-            } catch {}
+        if (!serviceAccount) {
+            this.log.error('No service account set, exiting...');
+            return;
         }
 
-        if (firebaseInit) {
-            firestore = firebase.firestore();
-            this.#firestore = firestore;
+        try {
+            firebase.initializeApp({
+                credential: firebase.credential.cert(serviceAccount),
+            });
+        } catch (e) {
+            this.log.error('Failed to initialize firebase');
+            this.log.error(e?.message || e);
+        }
+
+        const firestore = firebase.firestore();
+        this.#firestore = firestore;
+
+        let builtConfig: Partial<UsedConfig> = {};
+        const overwrite = !!jsonOverwrite;
+
+        const targetTypeRef = firestore.collection('devices').doc('definitions').collection('targetTypes');
+        const sourceTypeRef = firestore.collection('devices').doc('definitions').collection('sourceTypes');
+
+        if (jsonOverwrite) {
+            builtConfig = jsonOverwrite;
 
             await deleteCollection(firestore, 'devices');
             await deleteCollection(firestore, 'states');
             await deleteCollection(firestore, 'rooms');
 
+            const { sourceTypes, targetTypes } = jsonOverwrite;
+
+            for (const [name, sourceType] of Object.entries(sourceTypes)) {
+                try {
+                    await sourceTypeRef.doc(name).set({ entries: sourceType });
+                } catch (e) {
+                    this.log.error(`Failed to add doc with name "${name}"`);
+                    this.log.error(e?.message || e);
+                    this.stop?.call(this);
+                    return;
+                }
+            }
+
+            for (const [name, targetType] of Object.entries(targetTypes)) {
+                try {
+                    await targetTypeRef.doc(name).set({ entries: targetType });
+                } catch (e) {
+                    this.log.error(`Failed to add doc with name "${name}"`);
+                    this.log.error(e?.message || e);
+                    this.stop?.call(this);
+                    return;
+                }
+            }
+        } else {
+            const rooms: Room[] = (await firestore.collection('rooms').get()).docs.map(
+                (doc) => (doc.data() as FirestoreRoom).name,
+            );
+            const devices: Device[] = (await firestore.collection('rooms').get()).docs.map((doc) => {
+                const { name, roomName, sourceType, externalStates, path } = doc.data() as FirestoreDevice;
+
+                return { name, roomName, sourceType, externalStates, path };
+            });
+
+            const targetTypes: {
+                [key: string]: { name: string; optional?: boolean; external?: boolean; virtual?: boolean }[];
+            } = {};
+            for (const doc of (await targetTypeRef.get()).docs) {
+                targetTypes[doc.id] = doc.data().entries as {
+                    name: string;
+                    optional?: boolean;
+                    external?: boolean;
+                    virtual?: boolean;
+                }[];
+            }
+
+            const sourceTypes: {
+                [key: string]: {
+                    targetType: string;
+                    values: {
+                        targetValueName: string;
+                        sourceValueName: string;
+                    }[];
+                };
+            } = {};
+            for (const doc of (await sourceTypeRef.get()).docs) {
+                sourceTypes[doc.id] = doc.data().entries as {
+                    targetType: string;
+                    values: {
+                        targetValueName: string;
+                        sourceValueName: string;
+                    }[];
+                };
+            }
+
+            builtConfig.devices = devices;
+            builtConfig.rooms = rooms;
+            builtConfig.sourceTypes = sourceTypes;
+            builtConfig.targetTypes = targetTypes;
+
+            const configHasChanged = !deepEqual(builtConfig, this.config.usedConfig);
+            if (configHasChanged) {
+                this.log.info('Config changed');
+                this.log.info(JSON.stringify(builtConfig));
+                this.log.info(JSON.stringify(this.config.usedConfig));
+
+                this.updateConfig({
+                    usedConfig: builtConfig as Required<UsedConfig>,
+                });
+
+                return;
+            }
+        }
+
+        const usedConfig = builtConfig as UsedConfig;
+        const { rooms, devices, sourceTypes, targetTypes } = usedConfig;
+
+        if (jsonOverwrite) {
             for (const room of rooms) {
                 try {
                     await firestore.collection('rooms').add({ name: room });
@@ -125,16 +211,23 @@ class SmartConnectFirestoreSync extends utils.Adapter {
 
             const { targetType: deviceTargetType, values: sourceValues } = deviceSourceObject;
 
-            const targeValues = Object.entries(this.config.targetTypes).find(([key]) => key === deviceTargetType)?.[1];
+            const targetValues = Object.entries(targetTypes).find(([key]) => key === deviceTargetType)?.[1];
 
-            if (!targeValues) {
+            if (!targetValues) {
                 continue;
             }
 
             const targetDeviceBasePath = `states.${deviceRoomName}.${deviceTargetType}.${deviceName}`;
 
-            if (firestore) {
-                const deviceDocData = { name: deviceName, roomName: deviceRoomName, type: deviceTargetType };
+            if (overwrite) {
+                const deviceDocData: FirestoreDevice = {
+                    name: deviceName,
+                    roomName: deviceRoomName,
+                    type: deviceTargetType,
+                    sourceType: deviceSourceType,
+                    path: devicePath,
+                    ...(externalStates ? { externalStates } : {}),
+                };
 
                 try {
                     await firestore.collection('devices').add(deviceDocData);
@@ -144,7 +237,7 @@ class SmartConnectFirestoreSync extends utils.Adapter {
                 }
             }
 
-            for (const targetValueEntry of targeValues) {
+            for (const targetValueEntry of targetValues) {
                 const { name: targetValueName, external = false, optional = false, virtual = false } = targetValueEntry;
                 // Create states in adapter
                 const valueBasePath = `${targetDeviceBasePath}.${targetValueName}`;
@@ -199,7 +292,7 @@ class SmartConnectFirestoreSync extends utils.Adapter {
                 await this.setStateAsync(`${valueBasePath}.value`, { val: actualValue, ack: true });
                 await this.setStateAsync(`${valueBasePath}.timestamp`, { val: new Date().toUTCString(), ack: true });
 
-                if (firestore) {
+                if (overwrite) {
                     const stateDocData = {
                         deviceName,
                         roomName: deviceRoomName,
@@ -216,6 +309,15 @@ class SmartConnectFirestoreSync extends utils.Adapter {
                     }
                 }
             }
+        }
+
+        if (overwrite) {
+            this.updateConfig({
+                jsonOverwrite: undefined,
+                usedConfig,
+            });
+
+            return;
         }
 
         firestore?.collection('states').onSnapshot((snap) => {
@@ -259,11 +361,11 @@ class SmartConnectFirestoreSync extends utils.Adapter {
         }
 
         if (isForeign) {
-            const externalDevice = this.config.devices.find(
+            const externalDevice = this.config.usedConfig.devices.find(
                 ({ externalStates }) =>
                     externalStates && Object.values(externalStates).find((externalPath) => id.includes(externalPath)),
             );
-            const defaultDevice = this.config.devices.find(({ path }) => path && id.includes(path));
+            const defaultDevice = this.config.usedConfig.devices.find(({ path }) => path && id.includes(path));
 
             const device = defaultDevice || externalDevice;
 
@@ -274,7 +376,7 @@ class SmartConnectFirestoreSync extends utils.Adapter {
             let targetPath: string | undefined = undefined;
             let targetValue: string | undefined = undefined;
 
-            const sourceTypeDevice = this.config.sourceTypes[device.sourceType];
+            const sourceTypeDevice = this.config.usedConfig.sourceTypes[device.sourceType];
 
             if (defaultDevice) {
                 if (!device.path) {
@@ -334,7 +436,7 @@ class SmartConnectFirestoreSync extends utils.Adapter {
             const [, , , roomName, targetDeviceType, deviceName, valueName, valueProperty] = id.split('.');
             if (valueProperty !== 'value') return;
             try {
-                const device = this.config.devices.find(
+                const device = this.config.usedConfig.devices.find(
                     ({ roomName: deviceRoomName, name }) => deviceRoomName === roomName && name === deviceName,
                 );
 
@@ -348,7 +450,7 @@ class SmartConnectFirestoreSync extends utils.Adapter {
 
                 const { sourceType, path: sourceDeviceBasePath } = device;
 
-                const targetValueDefinition = this.config.targetTypes[targetDeviceType].find(
+                const targetValueDefinition = this.config.usedConfig.targetTypes[targetDeviceType].find(
                     ({ name }) => valueName === name,
                 );
 
@@ -358,7 +460,7 @@ class SmartConnectFirestoreSync extends utils.Adapter {
 
                 const isExternal = !!targetValueDefinition.external;
 
-                const sourceDeviceType = this.config.sourceTypes[sourceType];
+                const sourceDeviceType = this.config.usedConfig.sourceTypes[sourceType];
 
                 if (!sourceDeviceType) {
                     return;

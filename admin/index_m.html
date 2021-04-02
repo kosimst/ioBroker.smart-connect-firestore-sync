@@ -15,399 +15,37 @@
         <link rel="stylesheet" type="text/css" href="style.css" />
         <script type="text/javascript" src="words.js"></script>
         <script type="module">
-            import { html, render as litRender } from 'https://unpkg.com/lit-html?module';
+            let settings;
 
-            const render = (...args) => {
-                litRender(...args);
-
-                M?.updateTextFields();
-                const elemnts = document.querySelectorAll('select');
-                M.FormSelect.init(elemnts);
-            };
-
-            const renderDevices = (container = document.getElementById('devices')) => (settings) => {
-                const { devices } = settings;
-
-                const onChange = (index, key) => ({ target: { value, checked } }) => {
-                    const newDevices = [...devices];
-                    newDevices[index][key] = value;
-                    settings.devices = newDevices;
-                };
-
-                const addRow = () => {
-                    const newDevices = [
-                        ...devices,
-                        {
-                            name: 'New device',
-                            sourceType: Object.keys(settings.sourceTypes)[0],
-                            roomName: settings.rooms[0],
-                        },
-                    ];
-                    settings.devices = newDevices;
-                };
-
-                console.log(settings);
-
-                const rows = [
-                    ...devices.map(({ name, path, roomName, sourceType }, i) =>
-                        sourceType !== 'scene'
-                            ? html`<div class="row">
-                                  <div class="col s3 input-field">
-                                      <input
-                                          type="text"
-                                          class="value"
-                                          id="device-name-${i}"
-                                          placeholder="Device name..."
-                                          .value="${name}"
-                                          @change=${onChange(i, 'name')}
-                                      />
-                                      <label for="device-name-${i}" class="translate">Name</label>
-                                  </div>
-                                  <div class="col s2 input-field">
-                                      <select
-                                          class="value"
-                                          id="device-room-${i}"
-                                          .value="${roomName}"
-                                          @change=${onChange(i, 'roomName')}
-                                      >
-                                          ${settings.rooms.map(
-                                              (room) => html`<option .value="${room}">${room}</option>`,
-                                          )}
-                                      </select>
-                                      <label for="device-room-${i}" class="translate">Room</label>
-                                  </div>
-                                  <div class="col s3 input-field">
-                                      <select
-                                          class="value"
-                                          id="device-source-type-${i}"
-                                          .value="${sourceType}"
-                                          @change=${onChange(i, 'sourceType')}
-                                      >
-                                          ${Object.keys(settings.sourceTypes).map(
-                                              (sourceType) =>
-                                                  html`<option value="${sourceType}">${sourceType}</option>`,
-                                          )}
-                                      </select>
-                                      <label for="device-source-type-${i}" class="translate">Device type</label>
-                                  </div>
-                                  <div class="col s4 input-field">
-                                      <input
-                                          type="text"
-                                          class="value"
-                                          id="device-path-${i}"
-                                          placeholder="Device path..."
-                                          .value="${path || ''}"
-                                          @change=${onChange(i, 'path')}
-                                      />
-                                      <label for="device-path-${i}" class="translate">Path</label>
-                                  </div>
-                              </div>`
-                            : null,
-                    ),
-                    html`<div class="row">
-                        <div class="col s6 input-field">
-                            <a class="btn" @click=${addRow}>Add device</a>
-                        </div>
-                    </div>`,
-                ];
-
-                render(rows, container);
-            };
-
-            const renderRooms = (container = document.getElementById('rooms')) => (settings) => {
-                const { rooms } = settings;
-
-                const onChange = (index) => ({ target: { value, checked } }) => {
-                    const newRooms = [...rooms];
-                    newRooms[index] = value;
-                    settings.rooms = newRooms;
-                };
-
-                const addRoom = () => {
-                    settings.rooms = [...rooms, 'New Room'];
-                };
-
-                const rows = [
-                    ...rooms.map(
-                        (room, i) => html`<div class="row">
-                            <div class="col s12 input-field">
-                                <input
-                                    type="text"
-                                    class="value"
-                                    id="room-${i}"
-                                    placeholder="Room name..."
-                                    .value=${room}
-                                    @change=${onChange(i)}
-                                />
-                                <label for="room-${i}" class="translate">Room Name</label>
-                            </div>
-                        </div>`,
-                    ),
-                    html`<div class="row">
-                        <div class="col s6 input-field">
-                            <a class="btn" @click=${addRoom}>Add room</a>
-                        </div>
-                    </div>`,
-                ];
-
-                render(rows, container);
-            };
-
-            const renderDeviceTypes = (container = document.getElementById('device-types')) => (settings) => {
-                const onChange = (index) => ({ target: { value, checked } }) => {};
-
-                const addDeviceType = () => {
-                    settings.sourceTypes = {
-                        ...settings.sourceTypes,
-                        'new-source-type': { targetType: Object.keys(settings.targetTypes)[0], values: [] },
-                    };
-                };
-
-                const rows = Object.entries(settings.sourceTypes)
-                    .map(([name, definition], i) => [
-                        html`<div class="row">
-                            <div class="col s6 input-field">
-                                <input type="text" class="value" id="serviceAccount" value="${name}" />
-                                <label for="option1" class="translate">Source Device Type</label>
-                            </div>
-                            <div class="col s6 input-field">
-                                <select class="value" id="device-type" value="${definition.targetType}">
-                                    ${Object.keys(settings.targetTypes).map(
-                                        (targetType) => html`<option value="${targetType}">${targetType}</option>`,
-                                    )}
-                                </select>
-                                <label for="test" class="translate">Device Device Type</label>
-                            </div>
-                        </div>`,
-                        settings.targetTypes[definition.targetType].map((targetValueName) => {
-                            const { sourceValueName = targetValueName } =
-                                definition.values.find(({ targetValueName: a }) => a === targetValueName) || {};
-                            return html`<div class="row">
-                                    <div class="col s1 input-field"></div>
-                                    <div class="col s2 input-field">
-                                        <input
-                                            type="text"
-                                            class="value"
-                                            id="sourceValueName"
-                                            .value="${sourceValueName}"
-                                        />
-                                        <label for="sourceValueName" class="translate">Source Value Name</label>
-                                    </div>
-                                    <div class="col s2 input-field">
-                                        <input
-                                            type="text"
-                                            class="value"
-                                            id="targetValueName"
-                                            .value="${targetValueName}"
-                                        />
-                                        <label for="targetValueName" class="translate">Target Value Name</label>
-                                    </div>
-                                    <div class="col s4 input-field"></div>
-                                </div>
-                                <div class="row">
-                                    <div class="col s1 input-field"></div>
-                                    <div class="col s6 input-field">
-                                        <a class="btn">Add value mapping</a>
-                                    </div>
-                                </div>`;
-                        }),
-                        html`<div class="row">
-                            <div class="col s6 input-field">
-                                <a class="btn" @click=${addDeviceType}>Add source device type</a>
-                            </div>
-                        </div>`,
-                    ])
-                    .flat();
-
-                render(rows, container);
-            };
-
-            const renderTargetTypes = (container = document.getElementById('target-types')) => (settings) => {
-                const { rooms } = settings;
-
-                const onChange = (index) => ({ target: { value, checked } }) => {};
-
-                const addTargetDevice = () => {
-                    settings.targetTypes = { ...settings.targetTypes, target: [] };
-                };
-
-                const addDeviceValue = (name) => () => {
-                    settings.targetTypes = {
-                        ...settings.targetTypes,
-                        [name]: [...settings.targetTypes[name], 'value'],
-                    };
-                };
-
-                const rows = [
-                    ...Object.entries(settings.targetTypes).map(([name, definition], i) => [
-                        html`<div class="row">
-                            <div class="col s6 input-field">
-                                <input
-                                    type="text"
-                                    class="value"
-                                    id="serviceAccount"
-                                    placeholder="Room name..."
-                                    value="${name}"
-                                />
-                                <label for="option1" class="translate">Target Device Type</label>
-                            </div>
-                        </div>`,
-                        [
-                            ...definition.map(
-                                (targetValueName) =>
-                                    html`<div class="row">
-                                        <div class="col s1 input-field"></div>
-                                        <div class="col s2 input-field">
-                                            <input
-                                                type="text"
-                                                class="value"
-                                                id="targetValueName"
-                                                placeholder="Room name..."
-                                                .value="${targetValueName}"
-                                            />
-                                            <label for="targetValueName" class="translate">Target Value Name</label>
-                                        </div>
-                                        <div class="col s4 input-field"></div>
-                                    </div> `,
-                            ),
-                            html`<div class="row">
-                                <div class="col s1 input-field"></div>
-                                <div class="col s6 input-field">
-                                    <a class="btn" @click=${addDeviceValue(name)}>Add value</a>
-                                </div>
-                            </div>`,
-                        ],
-                    ]),
-                    html`<div class="row">
-                        <div class="col s6 input-field">
-                            <a class="btn" @click=${addTargetDevice}>Add target device type</a>
-                        </div>
-                    </div>`,
-                ].flat();
-
-                render(rows, container);
-            };
-
-            const renderScenes = (container = document.getElementById('scenes')) => (settings) => {
-                const { devices } = settings;
-
-                const onChange = (index, key) => ({ target: { value, checked } }) => {
-                    const newDevices = [...devices];
-                    newDevices[index][key] = value;
-                    settings.devices = newDevices;
-                };
-
-                const addRow = () => {
-                    const newDevices = [
-                        ...devices,
-                        {
-                            name: 'New scene',
-                            sourceType: 'scene',
-                            roomName: settings.rooms[0],
-                        },
-                    ];
-                    settings.devices = newDevices;
-                };
-
-                const rows = [
-                    ...devices.map(({ name, path, roomName, sourceType }, i) =>
-                        sourceType === 'scene'
-                            ? html`<div class="row">
-                                  <div class="col s3 input-field">
-                                      <input
-                                          type="text"
-                                          class="value"
-                                          id="scene-name-${i}"
-                                          placeholder="Scene name..."
-                                          .value="${name}"
-                                          @change=${onChange(i, 'name')}
-                                      />
-                                      <label for="device-name-${i}" class="translate">Name</label>
-                                  </div>
-                                  <div class="col s3 input-field">
-                                      <select
-                                          class="value"
-                                          id="scene-room-${i}"
-                                          .value="${roomName}"
-                                          @change=${onChange(i, 'roomName')}
-                                      >
-                                          ${settings.rooms.map(
-                                              (room) => html`<option .value="${room}">${room}</option>`,
-                                          )}
-                                      </select>
-                                      <label for="device-room-${i}" class="translate">Room</label>
-                                  </div>
-                                  <div class="col s6 input-field">
-                                      <input
-                                          type="text"
-                                          class="value"
-                                          id="scene-path-${i}"
-                                          placeholder="Optional sync path..."
-                                          .value="${path || ''}"
-                                          @change=${onChange(i, 'path')}
-                                      />
-                                      <label for="device-path-${i}" class="translate">Path</label>
-                                  </div>
-                              </div>`
-                            : null,
-                    ),
-                    html`<div class="row">
-                        <div class="col s6 input-field">
-                            <a class="btn" @click=${addRow}>Add Scene</a>
-                        </div>
-                    </div>`,
-                ];
-
-                render(rows, container);
-            };
-
-            window.load = function load(settings, onChange) {
-                if (!settings) return;
+            window.load = function load(currentSettings, onChange) {
+                if (!currentSettings) return;
                 onChange(false);
 
-                const devicesRenderer = renderDevices();
-                const roomsRenderer = renderRooms();
-                const deviceTypesRenderer = renderDeviceTypes();
-                const targetDevicesRender = renderTargetTypes();
-                const scenesRenderer = renderScenes();
+                settings = currentSettings;
 
-                window.settingsProxy = new Proxy(settings, {
-                    get(target, key) {
-                        return Object.freeze(target[key]);
-                    },
-                    set(target, key, value) {
-                        target[key] = value;
-                        console.log(target);
-                        onChange();
-
-                        //devicesRenderer(settingsProxy);
-                        //roomsRenderer(settingsProxy);
-                        //deviceTypesRenderer(settingsProxy);
-                        //targetDevicesRender(settingsProxy);
-                        //scenesRenderer(settingsProxy);
-
-                        return true;
-                    },
-                });
-
-                const serviceAccountInput = document.getElementById('json-input');
-                serviceAccountInput.value = JSON.stringify(settingsProxy);
-                serviceAccountInput.onchange = ({ target: { value } }) => {
+                const serviceAccountInput = document.getElementById('service-account');
+                serviceAccountInput.value = JSON.stringify(settings.serviceAccount);
+                serviceAccountInput.onkeypress = ({ target: { value } }) => {
                     try {
-                        window.settingsProxy = JSON.parse(value);
+                        settings.serviceAccount = JSON.parse(value);
                         onChange();
                     } catch {}
                 };
 
-                //devicesRenderer(settingsProxy);
-                //roomsRenderer(settingsProxy);
-                //deviceTypesRenderer(settingsProxy);
-                //targetDevicesRender(settingsProxy);
-                //scenesRenderer(settingsProxy);
+                const jsonInput = document.getElementById('json-overwrite');
+                jsonInput.onkeypress = ({ target: { value } }) => {
+                    try {
+                        settings.jsonOverwrite = JSON.parse(value);
+                        onChange();
+                    } catch {}
+                };
+
+                const usedConfigInput = document.getElementById('used-config');
+                usedConfigInput.value = JSON.stringify(settings.usedConfig);
             };
 
             window.save = function save(callback) {
-                callback(settingsProxy);
+                callback(settings);
             };
         </script>
     </head>
@@ -418,45 +56,25 @@
             <br />
             <div class="row">
                 <div class="col s6 input-field">
-                    <input type="text" class="value" id="json-input" placeholder="Paste your raw JSON config here..." />
-                    <label for="json-input" class="translate">JSON Input</label>
+                    <input type="text" class="value" id="service-account" placeholder="Firebase service account..." />
+                    <label for="service-account" class="translate">Service Account</label>
+                </div>
+                <div class="col s6 input-field">
+                    <input type="text" class="value" id="json-overwrite" placeholder="JSON Overwrite" />
+                    <label for="json-overwrite" class="translate">JSON Overwrite</label>
                 </div>
             </div>
 
-            <hr />
-            <hr />
             <br />
+            <hr />
             <br />
 
-            <div id="devices"></div>
-
-            <hr />
-            <hr />
-            <br />
-            <br />
-
-            <div id="device-types"></div>
-
-            <hr />
-            <hr />
-            <br />
-            <br />
-
-            <div id="rooms"></div>
-
-            <hr />
-            <hr />
-            <br />
-            <br />
-
-            <div id="target-types"></div>
-
-            <hr />
-            <hr />
-            <br />
-            <br />
-
-            <div id="scenes"></div>
+            <div class="row">
+                <div class="col s12 input-field">
+                    <input type="text" class="value" id="used-config" disabled />
+                    <label for="used-config" class="translate">Used Config</label>
+                </div>
+            </div>
         </div>
     </body>
 </html>
