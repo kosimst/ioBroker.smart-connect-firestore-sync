@@ -74,7 +74,7 @@ class SmartConnectFirestoreSync extends utils.Adapter {
         const targetTypeRef = firestore.collection('devices').doc('definitions').collection('targetTypes');
         const sourceTypeRef = firestore.collection('devices').doc('definitions').collection('sourceTypes');
         const rooms = (await firestore.collection('rooms').get()).docs.map((doc) => doc.data().name);
-        const devices = (await firestore.collection('rooms').get()).docs.map((doc) => {
+        const devices = (await firestore.collection('devices').get()).docs.map((doc) => {
             const { name, roomName, sourceType, externalStates, path } = doc.data();
             return { name, roomName, sourceType, externalStates, path };
         });
@@ -98,25 +98,17 @@ class SmartConnectFirestoreSync extends utils.Adapter {
             const usedPath = path.split('0.')[1];
             await this.delObjectAsync(usedPath);
         }
-        this.log.info(`Iterating over ${devices.length} devices..`);
         for (const { name: deviceName, roomName: deviceRoomName, sourceType: deviceSourceType, path: devicePath, externalStates, } of devices) {
             const deviceSourceObject = sourceTypes[deviceSourceType];
             if (!deviceSourceObject) {
-                this.log.info('Skipping due to no source object');
-                this.log.info(JSON.stringify(sourceTypes));
-                this.log.info(deviceSourceType);
                 continue;
             }
             const { targetType: deviceTargetType, values: sourceValues } = deviceSourceObject;
             const targetValues = (_a = Object.entries(targetTypes).find(([key]) => key === deviceTargetType)) === null || _a === void 0 ? void 0 : _a[1];
             if (!targetValues) {
-                this.log.info('Skipping due to no target values');
-                this.log.info(JSON.stringify(targetTypes));
-                this.log.info(deviceTargetType);
                 continue;
             }
             const targetDeviceBasePath = `states.${deviceRoomName}.${deviceTargetType}.${deviceName}`;
-            this.log.info(`${targetValues.length} values for ${deviceName}...`);
             for (const targetValueEntry of targetValues) {
                 const { name: targetValueName, external = false, optional = false, virtual = false } = targetValueEntry;
                 // Create states in adapter
@@ -129,7 +121,6 @@ class SmartConnectFirestoreSync extends utils.Adapter {
                     ((!sourceValue && !external) || (external && (!externalStates || !externalStates[targetValueName])))) {
                     continue;
                 }
-                this.log.info(`Creating objects...`);
                 await this.setObjectNotExistsAsync(`${valueBasePath}.value`, {
                     type: 'state',
                     common: {

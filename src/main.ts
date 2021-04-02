@@ -46,7 +46,7 @@ class SmartConnectFirestoreSync extends utils.Adapter {
         const rooms: Room[] = (await firestore.collection('rooms').get()).docs.map(
             (doc) => (doc.data() as FirestoreRoom).name,
         );
-        const devices: Device[] = (await firestore.collection('rooms').get()).docs.map((doc) => {
+        const devices: Device[] = (await firestore.collection('devices').get()).docs.map((doc) => {
             const { name, roomName, sourceType, externalStates, path } = doc.data() as FirestoreDevice;
 
             return { name, roomName, sourceType, externalStates, path };
@@ -99,7 +99,6 @@ class SmartConnectFirestoreSync extends utils.Adapter {
             await this.delObjectAsync(usedPath);
         }
 
-        this.log.info(`Iterating over ${devices.length} devices..`);
         for (const {
             name: deviceName,
             roomName: deviceRoomName,
@@ -110,9 +109,6 @@ class SmartConnectFirestoreSync extends utils.Adapter {
             const deviceSourceObject = sourceTypes[deviceSourceType];
 
             if (!deviceSourceObject) {
-                this.log.info('Skipping due to no source object');
-                this.log.info(JSON.stringify(sourceTypes));
-                this.log.info(deviceSourceType);
                 continue;
             }
 
@@ -121,15 +117,11 @@ class SmartConnectFirestoreSync extends utils.Adapter {
             const targetValues = Object.entries(targetTypes).find(([key]) => key === deviceTargetType)?.[1];
 
             if (!targetValues) {
-                this.log.info('Skipping due to no target values');
-                this.log.info(JSON.stringify(targetTypes));
-                this.log.info(deviceTargetType);
                 continue;
             }
 
             const targetDeviceBasePath = `states.${deviceRoomName}.${deviceTargetType}.${deviceName}`;
 
-            this.log.info(`${targetValues.length} values for ${deviceName}...`);
             for (const targetValueEntry of targetValues) {
                 const { name: targetValueName, external = false, optional = false, virtual = false } = targetValueEntry;
                 // Create states in adapter
@@ -147,8 +139,6 @@ class SmartConnectFirestoreSync extends utils.Adapter {
                 ) {
                     continue;
                 }
-
-                this.log.info(`Creating objects...`);
 
                 await this.setObjectNotExistsAsync(`${valueBasePath}.value`, {
                     type: 'state',
