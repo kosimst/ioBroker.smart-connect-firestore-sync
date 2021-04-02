@@ -162,6 +162,7 @@ class SmartConnectFirestoreSync extends utils.Adapter {
 
             const configHasChanged = !deepEqual(builtConfig, this.config.usedConfig);
             if (configHasChanged) {
+                this.log.info(String(deepEqual(builtConfig, this.config.usedConfig)));
                 this.log.info('Config changed');
                 this.log.info(JSON.stringify(builtConfig));
                 this.log.info(JSON.stringify(this.config.usedConfig));

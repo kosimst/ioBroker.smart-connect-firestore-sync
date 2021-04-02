@@ -25,7 +25,7 @@
                 settings = currentSettings;
 
                 const serviceAccountInput = document.getElementById('service-account');
-                serviceAccountInput.value = JSON.stringify(settings.serviceAccount);
+                serviceAccountInput.value = JSON.stringify(settings.serviceAccount) || '';
                 serviceAccountInput.onchange = ({ target: { value } }) => {
                     try {
                         settings.serviceAccount = JSON.parse(value);
@@ -46,7 +46,7 @@
                 };
 
                 const usedConfigInput = document.getElementById('used-config');
-                usedConfigInput.value = JSON.stringify(settings.usedConfig);
+                usedConfigInput.value = JSON.stringify(settings.usedConfig) || '';
             };
 
             window.save = function save(callback) {
