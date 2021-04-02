@@ -18,6 +18,7 @@
             let settings;
 
             window.load = function load(currentSettings, onChange) {
+                console.log(currentSettings);
                 if (!currentSettings) return;
                 onChange(false);
 
@@ -29,7 +30,9 @@
                     try {
                         settings.serviceAccount = JSON.parse(value);
                         onChange();
-                    } catch {}
+                    } catch (e) {
+                        console.error(e);
+                    }
                 };
 
                 const jsonInput = document.getElementById('json-overwrite');
@@ -37,7 +40,9 @@
                     try {
                         settings.jsonOverwrite = JSON.parse(value);
                         onChange();
-                    } catch {}
+                    } catch (e) {
+                        console.error(e);
+                    }
                 };
 
                 const usedConfigInput = document.getElementById('used-config');
