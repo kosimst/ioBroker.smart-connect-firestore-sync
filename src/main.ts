@@ -110,6 +110,9 @@ class SmartConnectFirestoreSync extends utils.Adapter {
             const deviceSourceObject = sourceTypes[deviceSourceType];
 
             if (!deviceSourceObject) {
+                this.log.info('Skipping due to no source object');
+                this.log.info(JSON.stringify(sourceTypes));
+                this.log.info(deviceSourceType);
                 continue;
             }
 
@@ -118,6 +121,9 @@ class SmartConnectFirestoreSync extends utils.Adapter {
             const targetValues = Object.entries(targetTypes).find(([key]) => key === deviceTargetType)?.[1];
 
             if (!targetValues) {
+                this.log.info('Skipping due to no target values');
+                this.log.info(JSON.stringify(targetTypes));
+                this.log.info(deviceTargetType);
                 continue;
             }
 

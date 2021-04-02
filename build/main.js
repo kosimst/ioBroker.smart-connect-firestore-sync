@@ -102,11 +102,17 @@ class SmartConnectFirestoreSync extends utils.Adapter {
         for (const { name: deviceName, roomName: deviceRoomName, sourceType: deviceSourceType, path: devicePath, externalStates, } of devices) {
             const deviceSourceObject = sourceTypes[deviceSourceType];
             if (!deviceSourceObject) {
+                this.log.info('Skipping due to no source object');
+                this.log.info(JSON.stringify(sourceTypes));
+                this.log.info(deviceSourceType);
                 continue;
             }
             const { targetType: deviceTargetType, values: sourceValues } = deviceSourceObject;
             const targetValues = (_a = Object.entries(targetTypes).find(([key]) => key === deviceTargetType)) === null || _a === void 0 ? void 0 : _a[1];
             if (!targetValues) {
+                this.log.info('Skipping due to no target values');
+                this.log.info(JSON.stringify(targetTypes));
+                this.log.info(deviceTargetType);
                 continue;
             }
             const targetDeviceBasePath = `states.${deviceRoomName}.${deviceTargetType}.${deviceName}`;
