@@ -198,7 +198,6 @@ class SmartConnectFirestoreSync extends utils.Adapter {
                         type: 'mixed',
                         read: true,
                         write: true,
-                        // TODO: Add more specific roles
                         role: 'state',
                     },
                     native: {},
@@ -210,7 +209,6 @@ class SmartConnectFirestoreSync extends utils.Adapter {
                         type: 'number',
                         read: true,
                         write: false,
-                        // TODO: Add more specific roles
                         role: 'state',
                     },
                     native: {},
@@ -349,15 +347,11 @@ class SmartConnectFirestoreSync extends utils.Adapter {
                 .collection('states')
                 .doc(getStatePath(device.roomName, sourceTypeDevice.targetType, device.name, targetValue));
 
-            const oldValue = (await doc.get()).data()?.value;
-
-            if (oldValue != state.val ?? null) {
-                try {
-                    await doc.update({ value: state.val ?? null, timestamp: new Date().toUTCString() });
-                } catch {
-                    this.log.error('Failed to update state in firestore:');
-                    this.log.error(JSON.stringify({ value: state.val ?? null, timestamp: new Date().toUTCString() }));
-                }
+            try {
+                await doc.update({ value: state.val ?? null, timestamp: new Date().toUTCString() });
+            } catch {
+                this.log.error('Failed to update state in firestore:');
+                this.log.error(JSON.stringify({ value: state.val ?? null, timestamp: new Date().toUTCString() }));
             }
         } else {
             const [, , , roomName, targetDeviceType, deviceName, valueName, valueProperty] = id.split('.');
