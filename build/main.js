@@ -163,7 +163,6 @@ class SmartConnectFirestoreSync extends utils.Adapter {
                         type: 'mixed',
                         read: true,
                         write: true,
-                        // TODO: Add more specific roles
                         role: 'state',
                     },
                     native: {},
@@ -175,7 +174,6 @@ class SmartConnectFirestoreSync extends utils.Adapter {
                         type: 'number',
                         read: true,
                         write: false,
-                        // TODO: Add more specific roles
                         role: 'state',
                     },
                     native: {},
@@ -242,7 +240,7 @@ class SmartConnectFirestoreSync extends utils.Adapter {
      * Is called if a subscribed state changes
      */
     async onStateChange(id, state) {
-        var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k;
+        var _a, _b, _c, _d, _e, _f, _g, _h;
         if (!__classPrivateFieldGet(this, _usedConfig))
             return;
         if (!__classPrivateFieldGet(this, _firestore))
@@ -290,15 +288,12 @@ class SmartConnectFirestoreSync extends utils.Adapter {
             await this.setStateAsync(`${targetPath}.timestamp`, { val: new Date().toUTCString(), ack: true });
             const doc = await __classPrivateFieldGet(this, _firestore).collection('states')
                 .doc(getStatePath(device.roomName, sourceTypeDevice.targetType, device.name, targetValue));
-            const oldValue = (_d = (await doc.get()).data()) === null || _d === void 0 ? void 0 : _d.value;
-            if ((_e = oldValue != state.val) !== null && _e !== void 0 ? _e : null) {
-                try {
-                    await doc.update({ value: (_f = state.val) !== null && _f !== void 0 ? _f : null, timestamp: new Date().toUTCString() });
-                }
-                catch (_l) {
-                    this.log.error('Failed to update state in firestore:');
-                    this.log.error(JSON.stringify({ value: (_g = state.val) !== null && _g !== void 0 ? _g : null, timestamp: new Date().toUTCString() }));
-                }
+            try {
+                await doc.update({ value: (_d = state.val) !== null && _d !== void 0 ? _d : null, timestamp: new Date().toUTCString() });
+            }
+            catch (_j) {
+                this.log.error('Failed to update state in firestore:');
+                this.log.error(JSON.stringify({ value: (_e = state.val) !== null && _e !== void 0 ? _e : null, timestamp: new Date().toUTCString() }));
             }
         }
         else {
@@ -323,16 +318,16 @@ class SmartConnectFirestoreSync extends utils.Adapter {
                 if (!sourceDeviceType) {
                     return;
                 }
-                const sourceDeviceValue = ((_h = sourceDeviceType.values.find(({ targetValueName }) => targetValueName === valueName)) === null || _h === void 0 ? void 0 : _h.sourceValueName) || valueName;
+                const sourceDeviceValue = ((_f = sourceDeviceType.values.find(({ targetValueName }) => targetValueName === valueName)) === null || _f === void 0 ? void 0 : _f.sourceValueName) || valueName;
                 if (!sourceDeviceValue) {
                     return;
                 }
                 const sourceDevicePath = isExternal
-                    ? ((_j = Object.entries(device.externalStates).find(([key]) => key === valueName)) === null || _j === void 0 ? void 0 : _j[1]) || ''
+                    ? ((_g = Object.entries(device.externalStates).find(([key]) => key === valueName)) === null || _g === void 0 ? void 0 : _g[1]) || ''
                     : `${sourceDeviceBasePath}.${sourceDeviceValue}`;
-                await this.setForeignStateAsync(sourceDevicePath, { val: (_k = state.val) !== null && _k !== void 0 ? _k : null });
+                await this.setForeignStateAsync(sourceDevicePath, { val: (_h = state.val) !== null && _h !== void 0 ? _h : null });
             }
-            catch (_m) { }
+            catch (_k) { }
         }
     }
 }
