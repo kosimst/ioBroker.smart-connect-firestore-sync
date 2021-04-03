@@ -206,6 +206,7 @@ class SmartConnectFirestoreSync extends utils.Adapter {
                 const { deviceName, roomName, name, value, deviceType } = change.doc.data();
                 const statePath = `states.${roomName}.${deviceType}.${deviceName}.${name}.value`;
                 const oldState = (_a = (await this.getStateAsync(statePath))) === null || _a === void 0 ? void 0 : _a.val;
+                this.log.info(`${oldState} == ${value}: ${oldState == value}`);
                 if (oldState == value)
                     return;
                 await this.setStateAsync(statePath, { val: value, ack: false });
