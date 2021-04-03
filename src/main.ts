@@ -343,16 +343,16 @@ class SmartConnectFirestoreSync extends utils.Adapter {
             await this.setStateAsync(`${targetPath}.value`, { val: state.val ?? null, ack: true });
             await this.setStateAsync(`${targetPath}.timestamp`, { val: new Date().toUTCString(), ack: true });
 
-            const doc = await this.#firestore
+            /*const doc = await this.#firestore
                 .collection('states')
                 .doc(getStatePath(device.roomName, sourceTypeDevice.targetType, device.name, targetValue));
 
             try {
                 await doc.update({ value: state.val ?? null, timestamp: new Date().toUTCString() });
-            } catch {
+            } catch (e) {
                 this.log.error('Failed to update state in firestore:');
-                this.log.error(JSON.stringify({ value: state.val ?? null, timestamp: new Date().toUTCString() }));
-            }
+                this.log.error(e);
+            }*/
         } else {
             const [, , , roomName, targetDeviceType, deviceName, valueName, valueProperty] = id.split('.');
             if (valueProperty !== 'value') return;
