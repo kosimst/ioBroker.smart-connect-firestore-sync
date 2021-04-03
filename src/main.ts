@@ -79,11 +79,20 @@ class SmartConnectFirestoreSync extends utils.Adapter {
             this.log.error(e?.message || e);
         }
 
-        const firestore = firebase.firestore();
-        this.#firestore = firestore;
+        try {
+            const firestore = firebase.firestore();
+            this.#firestore = firestore;
+        } catch (e) {
+            this.log.error('Failed to initialize firestore');
+            this.log.error(e?.message || e);
+        }
 
         try {
-            await deleteCollection(firestore, 'states');
+            if (this.#firestore) {
+                await deleteCollection(this.#firestore, 'states');
+            } else {
+                throw new Error('Firestore not present');
+            }
         } catch (e) {
             this.log.error('Failed to delete old state collection');
             this.log.error(e?.message || e);
@@ -92,62 +101,81 @@ class SmartConnectFirestoreSync extends utils.Adapter {
         let builtConfig: Partial<UsedConfig> | null = {};
 
         try {
-            const targetTypeRef = firestore.collection('devices').doc('definitions').collection('targetTypes');
-            const sourceTypeRef = firestore.collection('devices').doc('definitions').collection('sourceTypes');
+            if (this.#firestore) {
+                const targetTypeRef = this.#firestore
+                    .collection('devices')
+                    .doc('definitions')
+                    .collection('targetTypes');
+                const sourceTypeRef = this.#firestore
+                    .collection('devices')
+                    .doc('definitions')
+                    .collection('sourceTypes');
 
-            const rooms: Room[] = (await firestore.collection('rooms').get()).docs.map(
-                (doc) => (doc.data() as FirestoreRoom).name,
-            );
-            const devices: Device[] = (await firestore.collection('devices').get()).docs.map((doc) => {
-                const { name, roomName, sourceType, externalStates, path } = doc.data() as FirestoreDevice;
+                const rooms: Room[] = (await this.#firestore.collection('rooms').get()).docs.map(
+                    (doc) => (doc.data() as FirestoreRoom).name,
+                );
+                const devices: Device[] = (await this.#firestore.collection('devices').get()).docs.map((doc) => {
+                    const { name, roomName, sourceType, externalStates, path } = doc.data() as FirestoreDevice;
 
-                return { name, roomName, sourceType, externalStates, path };
-            });
+                    return { name, roomName, sourceType, externalStates, path };
+                });
 
-            const targetTypes: {
-                [key: string]: { name: string; optional?: boolean; external?: boolean; virtual?: boolean }[];
-            } = {};
-            for (const doc of (await targetTypeRef.get()).docs) {
-                targetTypes[doc.id] = doc.data().entries as {
-                    name: string;
-                    optional?: boolean;
-                    external?: boolean;
-                    virtual?: boolean;
-                }[];
-            }
-
-            const sourceTypes: {
-                [key: string]: {
-                    targetType: string;
-                    values: {
-                        targetValueName: string;
-                        sourceValueName: string;
+                const targetTypes: {
+                    [key: string]: { name: string; optional?: boolean; external?: boolean; virtual?: boolean }[];
+                } = {};
+                for (const doc of (await targetTypeRef.get()).docs) {
+                    targetTypes[doc.id] = doc.data().entries as {
+                        name: string;
+                        optional?: boolean;
+                        external?: boolean;
+                        virtual?: boolean;
                     }[];
-                };
-            } = {};
-            for (const doc of (await sourceTypeRef.get()).docs) {
-                sourceTypes[doc.id] = doc.data() as {
-                    targetType: string;
-                    values: {
-                        targetValueName: string;
-                        sourceValueName: string;
-                    }[];
-                };
-            }
+                }
 
-            builtConfig.devices = devices;
-            builtConfig.rooms = rooms;
-            builtConfig.sourceTypes = sourceTypes;
-            builtConfig.targetTypes = targetTypes;
+                const sourceTypes: {
+                    [key: string]: {
+                        targetType: string;
+                        values: {
+                            targetValueName: string;
+                            sourceValueName: string;
+                        }[];
+                    };
+                } = {};
+                for (const doc of (await sourceTypeRef.get()).docs) {
+                    sourceTypes[doc.id] = doc.data() as {
+                        targetType: string;
+                        values: {
+                            targetValueName: string;
+                            sourceValueName: string;
+                        }[];
+                    };
+                }
+
+                builtConfig.devices = devices;
+                builtConfig.rooms = rooms;
+                builtConfig.sourceTypes = sourceTypes;
+                builtConfig.targetTypes = targetTypes;
+            } else {
+                throw new Error('Firestore not present');
+            }
         } catch (e) {
             this.log.error('Failed to build state tree from firestore');
             this.log.error(e?.message || e);
             builtConfig = null;
         }
 
-        const usedConfig = builtConfig ? (builtConfig as UsedConfig) : (serviceAccount as UsedConfig);
-        this.#usedConfig = usedConfig;
-        const { devices, sourceTypes, targetTypes } = usedConfig;
+        let usedConfig = builtConfig;
+
+        if (!usedConfig) {
+            this.log.info('Trying to use manual input as fallback...');
+            if ('devices' in serviceAccount && 'sourceTypes' in serviceAccount && 'targetTypes' in serviceAccount) {
+                this.log.info('Manual input seems valid');
+                usedConfig = serviceAccount as UsedConfig;
+            }
+        }
+
+        this.#usedConfig = usedConfig as UsedConfig;
+        const { devices, sourceTypes, targetTypes } = usedConfig as UsedConfig;
 
         const oldStates = await this.getStatesAsync('states.*');
 
@@ -233,50 +261,67 @@ class SmartConnectFirestoreSync extends utils.Adapter {
                 await this.setStateAsync(`${valueBasePath}.value`, { val: actualValue, ack: true });
                 await this.setStateAsync(`${valueBasePath}.timestamp`, { val: new Date().toUTCString(), ack: true });
 
-                await firestore
-                    .collection('states')
-                    .doc(getStatePath(deviceRoomName, deviceTargetType, deviceName, targetValueName))
-                    .set({
-                        deviceName,
-                        roomName: deviceRoomName,
-                        name: targetValueName,
-                        value: actualValue,
-                        deviceType: deviceTargetType,
-                        timestamp: new Date().toUTCString(),
-                    });
+                try {
+                    if (this.#firestore) {
+                        await this.#firestore
+                            .collection('states')
+                            .doc(getStatePath(deviceRoomName, deviceTargetType, deviceName, targetValueName))
+                            .set({
+                                deviceName,
+                                roomName: deviceRoomName,
+                                name: targetValueName,
+                                value: actualValue,
+                                deviceType: deviceTargetType,
+                                timestamp: new Date().toUTCString(),
+                            });
+                    } else {
+                        throw new Error('Firestore not present');
+                    }
+                } catch (e) {
+                    this.log.error('Failed to initialize state in firestore');
+                    this.log.error(e?.message || e);
+                }
             }
         }
 
-        firestore.collection('states').onSnapshot((snap) => {
-            snap.docChanges().forEach(async (change) => {
-                const { deviceName, roomName, name, value, deviceType } = change.doc.data();
-                const statePath = `states.${roomName}.${deviceType}.${deviceName}.${name}.value`;
+        try {
+            if (this.#firestore) {
+                this.#firestore.collection('states').onSnapshot((snap) => {
+                    snap.docChanges().forEach(async (change) => {
+                        const { deviceName, roomName, name, value, deviceType } = change.doc.data();
+                        const statePath = `states.${roomName}.${deviceType}.${deviceName}.${name}.value`;
 
-                const oldState = (await this.getStateAsync(statePath))?.val;
+                        const oldState = (await this.getStateAsync(statePath))?.val;
 
-                this.log.info(`${oldState} == ${value}: ${oldState == value}`);
+                        this.log.info(`${oldState} == ${value}: ${oldState == value}`);
 
-                if (oldState == value) return;
+                        if (oldState == value) return;
 
-                await this.setStateAsync(statePath, { val: value, ack: false });
-            });
-        });
+                        await this.setStateAsync(statePath, { val: value, ack: false });
+                    });
+                });
 
-        await firestore.collection('settings').doc('firestore-sync').update({ restart: 0 });
+                await this.#firestore.collection('settings').doc('firestore-sync').update({ restart: 0 });
 
-        firestore
-            .collection('settings')
-            .doc('firestore-sync')
-            .onSnapshot(async (doc) => {
-                const { restart } = doc.data() as any;
+                this.#firestore
+                    .collection('settings')
+                    .doc('firestore-sync')
+                    .onSnapshot(async (doc) => {
+                        const { restart } = doc.data() as any;
 
-                if (Date.now() - restart > 1000) return;
+                        if (Date.now() - restart > 1000) return;
 
-                await doc.ref.update({ restart: -1 });
+                        await doc.ref.update({ restart: -1 });
 
-                await this.restart();
-            });
-
+                        await this.restart();
+                    });
+            } else {
+                throw new Error('Firestore not present');
+            }
+        } catch (e) {
+            this.log.error('Failed to add snapshot listeners');
+            this.log.error(e?.message || e);
+        }
         await this.subscribeStatesAsync('states.*');
     }
 
@@ -296,7 +341,6 @@ class SmartConnectFirestoreSync extends utils.Adapter {
      */
     private async onStateChange(id: string, state: ioBroker.State | null | undefined): Promise<void> {
         if (!this.#usedConfig) return;
-        if (!this.#firestore) return;
         if (!state) return;
 
         const isForeign = !id.includes('smart-connect-firestore-sync');
