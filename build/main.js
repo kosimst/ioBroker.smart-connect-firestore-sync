@@ -253,7 +253,6 @@ class SmartConnectFirestoreSync extends utils.Adapter {
                         const { deviceName, roomName, name, value, deviceType } = change.doc.data();
                         const statePath = `states.${roomName}.${deviceType}.${deviceName}.${name}.value`;
                         const oldState = (_a = (await this.getStateAsync(statePath))) === null || _a === void 0 ? void 0 : _a.val;
-                        this.log.info(`${oldState} == ${value}: ${oldState == value}`);
                         if (oldState == value)
                             return;
                         await this.setStateAsync(statePath, { val: value, ack: false });
@@ -296,7 +295,7 @@ class SmartConnectFirestoreSync extends utils.Adapter {
      * Is called if a subscribed state changes
      */
     async onStateChange(id, state) {
-        var _a, _b, _c, _d, _e, _f;
+        var _a, _b, _c, _d, _e, _f, _g;
         if (!__classPrivateFieldGet(this, _usedConfig))
             return;
         if (!state)
@@ -306,9 +305,6 @@ class SmartConnectFirestoreSync extends utils.Adapter {
         if (state.ack && !isForeign) {
             return;
         }
-        this.log.info('State change');
-        this.log.info(JSON.stringify(state));
-        this.log.info(`${isForeign}: ${id}`);
         if (isForeign) {
             const externalDevice = __classPrivateFieldGet(this, _usedConfig).devices.find(({ externalStates }) => externalStates && Object.values(externalStates).find((externalPath) => id.includes(externalPath)));
             const defaultDevice = __classPrivateFieldGet(this, _usedConfig).devices.find(({ path }) => path && id.includes(path));
@@ -343,16 +339,23 @@ class SmartConnectFirestoreSync extends utils.Adapter {
             }
             await this.setStateAsync(`${targetPath}.value`, { val: (_c = state.val) !== null && _c !== void 0 ? _c : null, ack: true });
             await this.setStateAsync(`${targetPath}.timestamp`, { val: new Date().toUTCString(), ack: true });
-            /*const doc = await this.#firestore
-                .collection('states')
-                .doc(getStatePath(device.roomName, sourceTypeDevice.targetType, device.name, targetValue));
-
             try {
-                await doc.update({ value: state.val ?? null, timestamp: new Date().toUTCString() });
-            } catch (e) {
-                this.log.error('Failed to update state in firestore:');
-                this.log.error(e);
-            }*/
+                if (!__classPrivateFieldGet(this, _firestore))
+                    return;
+                const doc = await __classPrivateFieldGet(this, _firestore).collection('states')
+                    .doc(getStatePath(device.roomName, sourceTypeDevice.targetType, device.name, targetValue));
+                try {
+                    await doc.update({ value: (_d = state.val) !== null && _d !== void 0 ? _d : null, timestamp: new Date().toUTCString() });
+                }
+                catch (e) {
+                    this.log.error('Failed to update state in firestore:');
+                    this.log.error(e);
+                }
+            }
+            catch (e) {
+                this.log.error('Failed to update state in firestore');
+                this.log.error((e === null || e === void 0 ? void 0 : e.message) || e);
+            }
         }
         else {
             const [, , , roomName, targetDeviceType, deviceName, valueName, valueProperty] = id.split('.');
@@ -376,16 +379,16 @@ class SmartConnectFirestoreSync extends utils.Adapter {
                 if (!sourceDeviceType) {
                     return;
                 }
-                const sourceDeviceValue = ((_d = sourceDeviceType.values.find(({ targetValueName }) => targetValueName === valueName)) === null || _d === void 0 ? void 0 : _d.sourceValueName) || valueName;
+                const sourceDeviceValue = ((_e = sourceDeviceType.values.find(({ targetValueName }) => targetValueName === valueName)) === null || _e === void 0 ? void 0 : _e.sourceValueName) || valueName;
                 if (!sourceDeviceValue) {
                     return;
                 }
                 const sourceDevicePath = isExternal
-                    ? ((_e = Object.entries(device.externalStates).find(([key]) => key === valueName)) === null || _e === void 0 ? void 0 : _e[1]) || ''
+                    ? ((_f = Object.entries(device.externalStates).find(([key]) => key === valueName)) === null || _f === void 0 ? void 0 : _f[1]) || ''
                     : `${sourceDeviceBasePath}.${sourceDeviceValue}`;
-                await this.setForeignStateAsync(sourceDevicePath, { val: (_f = state.val) !== null && _f !== void 0 ? _f : null });
+                await this.setForeignStateAsync(sourceDevicePath, { val: (_g = state.val) !== null && _g !== void 0 ? _g : null });
             }
-            catch (_g) { }
+            catch (_h) { }
         }
     }
 }

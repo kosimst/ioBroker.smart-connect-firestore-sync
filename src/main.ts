@@ -293,8 +293,6 @@ class SmartConnectFirestoreSync extends utils.Adapter {
 
                         const oldState = (await this.getStateAsync(statePath))?.val;
 
-                        this.log.info(`${oldState} == ${value}: ${oldState == value}`);
-
                         if (oldState == value) return;
 
                         await this.setStateAsync(statePath, { val: value, ack: false });
@@ -350,10 +348,6 @@ class SmartConnectFirestoreSync extends utils.Adapter {
             return;
         }
 
-        this.log.info('State change');
-        this.log.info(JSON.stringify(state));
-        this.log.info(`${isForeign}: ${id}`);
-
         if (isForeign) {
             const externalDevice = this.#usedConfig.devices.find(
                 ({ externalStates }) =>
@@ -400,16 +394,22 @@ class SmartConnectFirestoreSync extends utils.Adapter {
             await this.setStateAsync(`${targetPath}.value`, { val: state.val ?? null, ack: true });
             await this.setStateAsync(`${targetPath}.timestamp`, { val: new Date().toUTCString(), ack: true });
 
-            /*const doc = await this.#firestore
-                .collection('states')
-                .doc(getStatePath(device.roomName, sourceTypeDevice.targetType, device.name, targetValue));
-
             try {
-                await doc.update({ value: state.val ?? null, timestamp: new Date().toUTCString() });
+                if (!this.#firestore) return;
+                const doc = await this.#firestore
+                    .collection('states')
+                    .doc(getStatePath(device.roomName, sourceTypeDevice.targetType, device.name, targetValue));
+
+                try {
+                    await doc.update({ value: state.val ?? null, timestamp: new Date().toUTCString() });
+                } catch (e) {
+                    this.log.error('Failed to update state in firestore:');
+                    this.log.error(e);
+                }
             } catch (e) {
-                this.log.error('Failed to update state in firestore:');
-                this.log.error(e);
-            }*/
+                this.log.error('Failed to update state in firestore');
+                this.log.error(e?.message || e);
+            }
         } else {
             const [, , , roomName, targetDeviceType, deviceName, valueName, valueProperty] = id.split('.');
             if (valueProperty !== 'value') return;
