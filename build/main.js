@@ -308,6 +308,7 @@ class SmartConnectFirestoreSync extends utils.Adapter {
         }
         this.log.info('State change');
         this.log.info(JSON.stringify(state));
+        this.log.info(`${isForeign}: ${id}`);
         if (isForeign) {
             const externalDevice = __classPrivateFieldGet(this, _usedConfig).devices.find(({ externalStates }) => externalStates && Object.values(externalStates).find((externalPath) => id.includes(externalPath)));
             const defaultDevice = __classPrivateFieldGet(this, _usedConfig).devices.find(({ path }) => path && id.includes(path));
