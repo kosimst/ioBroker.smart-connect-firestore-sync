@@ -346,9 +346,12 @@ class SmartConnectFirestoreSync extends utils.Adapter {
         const isForeign = !id.includes('smart-connect-firestore-sync');
 
         // Ignore already synced state changes
-        if (state.ack) {
+        if (state.ack && !isForeign) {
             return;
         }
+
+        this.log.info('State change');
+        this.log.info(JSON.stringify(state));
 
         if (isForeign) {
             const externalDevice = this.#usedConfig.devices.find(
