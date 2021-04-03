@@ -303,7 +303,7 @@ class SmartConnectFirestoreSync extends utils.Adapter {
             return;
         const isForeign = !id.includes('smart-connect-firestore-sync');
         // Ignore already synced state changes
-        if (!isForeign && state.ack) {
+        if (state.ack) {
             return;
         }
         if (isForeign) {
