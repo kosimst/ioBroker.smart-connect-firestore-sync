@@ -105,28 +105,36 @@ class SmartConnectFirestoreSync extends utils.Adapter {
             this.log.error('Failed to delete old state collection');
             this.log.error((e === null || e === void 0 ? void 0 : e.message) || e);
         }
-        const builtConfig = {};
-        const targetTypeRef = firestore.collection('devices').doc('definitions').collection('targetTypes');
-        const sourceTypeRef = firestore.collection('devices').doc('definitions').collection('sourceTypes');
-        const rooms = (await firestore.collection('rooms').get()).docs.map((doc) => doc.data().name);
-        const devices = (await firestore.collection('devices').get()).docs.map((doc) => {
-            const { name, roomName, sourceType, externalStates, path } = doc.data();
-            return { name, roomName, sourceType, externalStates, path };
-        });
-        const targetTypes = {};
-        for (const doc of (await targetTypeRef.get()).docs) {
-            targetTypes[doc.id] = doc.data().entries;
+        let builtConfig = {};
+        try {
+            const targetTypeRef = firestore.collection('devices').doc('definitions').collection('targetTypes');
+            const sourceTypeRef = firestore.collection('devices').doc('definitions').collection('sourceTypes');
+            const rooms = (await firestore.collection('rooms').get()).docs.map((doc) => doc.data().name);
+            const devices = (await firestore.collection('devices').get()).docs.map((doc) => {
+                const { name, roomName, sourceType, externalStates, path } = doc.data();
+                return { name, roomName, sourceType, externalStates, path };
+            });
+            const targetTypes = {};
+            for (const doc of (await targetTypeRef.get()).docs) {
+                targetTypes[doc.id] = doc.data().entries;
+            }
+            const sourceTypes = {};
+            for (const doc of (await sourceTypeRef.get()).docs) {
+                sourceTypes[doc.id] = doc.data();
+            }
+            builtConfig.devices = devices;
+            builtConfig.rooms = rooms;
+            builtConfig.sourceTypes = sourceTypes;
+            builtConfig.targetTypes = targetTypes;
         }
-        const sourceTypes = {};
-        for (const doc of (await sourceTypeRef.get()).docs) {
-            sourceTypes[doc.id] = doc.data();
+        catch (e) {
+            this.log.error('Failed to build state tree from firestore');
+            this.log.error((e === null || e === void 0 ? void 0 : e.message) || e);
+            builtConfig = null;
         }
-        builtConfig.devices = devices;
-        builtConfig.rooms = rooms;
-        builtConfig.sourceTypes = sourceTypes;
-        builtConfig.targetTypes = targetTypes;
-        const usedConfig = builtConfig;
+        const usedConfig = builtConfig ? builtConfig : serviceAccount;
         __classPrivateFieldSet(this, _usedConfig, usedConfig);
+        const { devices, sourceTypes, targetTypes } = usedConfig;
         const oldStates = await this.getStatesAsync('states.*');
         this.log.info('Deleting old states...');
         for (const [path] of Object.entries(oldStates || {})) {

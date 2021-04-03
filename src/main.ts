@@ -89,58 +89,65 @@ class SmartConnectFirestoreSync extends utils.Adapter {
             this.log.error(e?.message || e);
         }
 
-        const builtConfig: Partial<UsedConfig> = {};
+        let builtConfig: Partial<UsedConfig> | null = {};
 
-        const targetTypeRef = firestore.collection('devices').doc('definitions').collection('targetTypes');
-        const sourceTypeRef = firestore.collection('devices').doc('definitions').collection('sourceTypes');
+        try {
+            const targetTypeRef = firestore.collection('devices').doc('definitions').collection('targetTypes');
+            const sourceTypeRef = firestore.collection('devices').doc('definitions').collection('sourceTypes');
 
-        const rooms: Room[] = (await firestore.collection('rooms').get()).docs.map(
-            (doc) => (doc.data() as FirestoreRoom).name,
-        );
-        const devices: Device[] = (await firestore.collection('devices').get()).docs.map((doc) => {
-            const { name, roomName, sourceType, externalStates, path } = doc.data() as FirestoreDevice;
+            const rooms: Room[] = (await firestore.collection('rooms').get()).docs.map(
+                (doc) => (doc.data() as FirestoreRoom).name,
+            );
+            const devices: Device[] = (await firestore.collection('devices').get()).docs.map((doc) => {
+                const { name, roomName, sourceType, externalStates, path } = doc.data() as FirestoreDevice;
 
-            return { name, roomName, sourceType, externalStates, path };
-        });
+                return { name, roomName, sourceType, externalStates, path };
+            });
 
-        const targetTypes: {
-            [key: string]: { name: string; optional?: boolean; external?: boolean; virtual?: boolean }[];
-        } = {};
-        for (const doc of (await targetTypeRef.get()).docs) {
-            targetTypes[doc.id] = doc.data().entries as {
-                name: string;
-                optional?: boolean;
-                external?: boolean;
-                virtual?: boolean;
-            }[];
+            const targetTypes: {
+                [key: string]: { name: string; optional?: boolean; external?: boolean; virtual?: boolean }[];
+            } = {};
+            for (const doc of (await targetTypeRef.get()).docs) {
+                targetTypes[doc.id] = doc.data().entries as {
+                    name: string;
+                    optional?: boolean;
+                    external?: boolean;
+                    virtual?: boolean;
+                }[];
+            }
+
+            const sourceTypes: {
+                [key: string]: {
+                    targetType: string;
+                    values: {
+                        targetValueName: string;
+                        sourceValueName: string;
+                    }[];
+                };
+            } = {};
+            for (const doc of (await sourceTypeRef.get()).docs) {
+                sourceTypes[doc.id] = doc.data() as {
+                    targetType: string;
+                    values: {
+                        targetValueName: string;
+                        sourceValueName: string;
+                    }[];
+                };
+            }
+
+            builtConfig.devices = devices;
+            builtConfig.rooms = rooms;
+            builtConfig.sourceTypes = sourceTypes;
+            builtConfig.targetTypes = targetTypes;
+        } catch (e) {
+            this.log.error('Failed to build state tree from firestore');
+            this.log.error(e?.message || e);
+            builtConfig = null;
         }
 
-        const sourceTypes: {
-            [key: string]: {
-                targetType: string;
-                values: {
-                    targetValueName: string;
-                    sourceValueName: string;
-                }[];
-            };
-        } = {};
-        for (const doc of (await sourceTypeRef.get()).docs) {
-            sourceTypes[doc.id] = doc.data() as {
-                targetType: string;
-                values: {
-                    targetValueName: string;
-                    sourceValueName: string;
-                }[];
-            };
-        }
-
-        builtConfig.devices = devices;
-        builtConfig.rooms = rooms;
-        builtConfig.sourceTypes = sourceTypes;
-        builtConfig.targetTypes = targetTypes;
-
-        const usedConfig = builtConfig as UsedConfig;
+        const usedConfig = builtConfig ? (builtConfig as UsedConfig) : (serviceAccount as UsedConfig);
         this.#usedConfig = usedConfig;
+        const { devices, sourceTypes, targetTypes } = usedConfig;
 
         const oldStates = await this.getStatesAsync('states.*');
 
