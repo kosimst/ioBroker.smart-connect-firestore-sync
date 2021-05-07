@@ -288,7 +288,8 @@ class SmartConnectFirestoreSync extends utils.Adapter {
             if (this.#firestore) {
                 this.#firestore.collection('states').onSnapshot((snap) => {
                     snap.docChanges().forEach(async (change) => {
-                        const { deviceName, roomName, name, value, deviceType } = change.doc.data();
+                        const { deviceName, roomName, name, value, deviceType, synced = false } = change.doc.data();
+                        if (synced) return;
                         const statePath = `states.${roomName}.${deviceType}.${deviceName}.${name}.value`;
 
                         const oldState = (await this.getStateAsync(statePath))?.val;
@@ -401,7 +402,7 @@ class SmartConnectFirestoreSync extends utils.Adapter {
                     .doc(getStatePath(device.roomName, sourceTypeDevice.targetType, device.name, targetValue));
 
                 try {
-                    await doc.update({ value: state.val ?? null, timestamp: new Date().toUTCString() });
+                    await doc.update({ value: state.val ?? null, timestamp: new Date().toUTCString(), synced: true });
                 } catch (e) {
                     this.log.error('Failed to update state in firestore:');
                     this.log.error(e);
