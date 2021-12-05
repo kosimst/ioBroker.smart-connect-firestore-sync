@@ -241,7 +241,7 @@ class SmartConnectFirestoreSync extends utils.Adapter {
                     type: 'state',
                     common: {
                         name: 'Timestamp of last change',
-                        type: 'number',
+                        type: 'string',
                         read: true,
                         write: false,
                         role: 'state',
